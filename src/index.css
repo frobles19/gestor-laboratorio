@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+*, *::before, *::after {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Reglas de refuerzo para evitar letras excesivamente pequeñas */
+.text-\[9px\] {
+  font-size: 11px !important;
+  line-height: 1.25rem !important;
+}
+
+.text-\[10px\] {
+  font-size: 12px !important;
+  line-height: 1.25rem !important;
+}
+
+.text-\[11px\] {
+  font-size: 13px !important;
+  line-height: 1.3rem !important;
+}
+
+.text-xs {
+  font-size: 13.5px !important;
+  line-height: 1.35rem !important;
+}
+
+.text-sm {
+  font-size: 15px !important;
+  line-height: 1.45rem !important;
+}
+
+.text-base {
+  font-size: 16.5px !important;
+  line-height: 1.55rem !important;
+}
+

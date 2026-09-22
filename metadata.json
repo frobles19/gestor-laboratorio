@@ -1,0 +1,6 @@
+{
+  "name": "Gestión Técnica de Radioayudas Aeronáuticas",
+  "description": "Sistema de gestión técnica de activos y radioayudas aeronáuticas (VOR, DME, ILS) con control de comisiones de servicio, cálculo de semáforos de vencimiento y flujo de trabajo estilo IBM Maximo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
