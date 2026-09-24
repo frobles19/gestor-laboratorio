@@ -48,6 +48,32 @@ const ACCION_CONFIG: Record<
 // Campos que no aportan valor de trazabilidad al mostrarse en el diff (ruido visual).
 const CAMPOS_OMITIDOS = new Set(['id']);
 
+// Nombres legibles para los campos técnicos de ComisionServicio, usados tanto
+// en la observación resumida como en el detalle campo por campo.
+const ETIQUETA_CAMPO: Record<string, string> = {
+  codigo: 'Código',
+  estado: 'Estado',
+  fechaSalida: 'Fecha de salida prevista',
+  fechaRegreso: 'Fecha de regreso prevista',
+  fechaSalidaReal: 'Fecha de salida real',
+  fechaRegresoReal: 'Fecha de regreso real',
+  medioTransporte: 'Medio de transporte',
+  destinosAeropuertos: 'Destinos',
+  tecnicosIds: 'Técnicos asignados',
+  jefeComisionId: 'Jefe de comisión',
+  tiposMantenimiento: 'Tipo(s) de mantenimiento',
+  objetivo: 'Objetivo',
+  observacionesCierre: 'Observaciones de cierre',
+  canceladaAt: 'Fecha de cancelación',
+  motivoCancelacion: 'Motivo de cancelación',
+  finalizadaAt: 'Fecha de finalización',
+  createdAt: 'Fecha de creación',
+};
+
+function etiquetaCampo(campo: string): string {
+  return ETIQUETA_CAMPO[campo] || campo;
+}
+
 function formatearValor(valor: unknown): string {
   if (valor === null || valor === undefined || valor === '') return '—';
   if (Array.isArray(valor)) return valor.length > 0 ? valor.join(', ') : '—';
@@ -74,6 +100,46 @@ function calcularDiferencias(
     }
   });
   return diffs;
+}
+
+// Arma la observación en lenguaje natural que se muestra en el listado
+// principal, según el tipo de acción registrada.
+function generarObservacion(
+  accion: AccionAuditoria,
+  anterior: Record<string, unknown> | null,
+  nuevo: Record<string, unknown> | null
+): string {
+  switch (accion) {
+    case 'CREAR':
+      return 'Se creó la comisión.';
+
+    case 'EDITAR': {
+      const diffs = calcularDiferencias(anterior, nuevo);
+      if (diffs.length === 0) return 'Se editó la comisión sin cambios de datos.';
+      const campos = diffs.map((d) => etiquetaCampo(d.campo)).join(', ');
+      return `Se editaron los campos: ${campos}.`;
+    }
+
+    case 'CANCELAR': {
+      const motivo = nuevo?.motivoCancelacion as string | undefined;
+      return motivo
+        ? `Se canceló la comisión. Motivo: ${motivo}`
+        : 'Se canceló la comisión (sin motivo especificado).';
+    }
+
+    case 'CERRAR': {
+      const tipos = (nuevo?.tiposMantenimiento as string[] | undefined) || [];
+      return tipos.length > 0
+        ? `Se cerró la comisión. Mantenimiento realizado: ${tipos.join(', ')}.`
+        : 'Se cerró la comisión.';
+    }
+
+    case 'ELIMINAR':
+      return 'Se eliminó la comisión definitivamente.';
+
+    default:
+      return '';
+  }
 }
 
 export const LogsComisionesView: React.FC = () => {
@@ -152,85 +218,106 @@ export const LogsComisionesView: React.FC = () => {
       </div>
 
       {/* Listado */}
-      <div className="bg-white border border-[#e0e0e0] divide-y divide-[#e0e0e0]">
-        {registrosFiltrados.length === 0 && (
+      <div className="bg-white border border-[#e0e0e0] overflow-x-auto">
+        {registrosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-sm text-[#8d8d8d]">
             No hay eventos registrados que coincidan con la búsqueda.
           </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#161616] text-white text-xs uppercase tracking-wide">
+                <th className="text-left p-3 font-bold">Comisión</th>
+                <th className="text-left p-3 font-bold">Fecha</th>
+                <th className="text-left p-3 font-bold">Tipo de Acción</th>
+                <th className="text-left p-3 font-bold">Observaciones</th>
+                <th className="p-3 font-bold w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {registrosFiltrados.map((registro) => {
+                const config = ACCION_CONFIG[registro.accion];
+                const Icon = config.icon;
+                const expandido = expandidoId === registro.id;
+                const diffs = calcularDiferencias(registro.estadoAnterior, registro.estadoNuevo);
+                const observacion = generarObservacion(
+                  registro.accion,
+                  registro.estadoAnterior,
+                  registro.estadoNuevo
+                );
+                const tieneDetalle = registro.accion === 'EDITAR' && diffs.length > 0;
+
+                return (
+                  <React.Fragment key={registro.id}>
+                    <tr className="border-b border-[#e0e0e0] hover:bg-[#f4f4f4] transition-colors">
+                      <td className="p-3 font-mono font-semibold text-[#161616] align-top whitespace-nowrap">
+                        {registro.entidadEtiqueta}
+                      </td>
+                      <td className="p-3 text-xs text-[#525252] align-top whitespace-nowrap font-mono">
+                        {formatearFecha(registro.fecha)}{' '}
+                        {new Date(registro.fecha).toLocaleTimeString('es-AR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="p-3 align-top whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${config.classes}`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{config.label}</span>
+                        </span>
+                      </td>
+                      <td className="p-3 text-[#161616] align-top">{observacion}</td>
+                      <td className="p-3 align-top text-right">
+                        {tieneDetalle && (
+                          <button
+                            onClick={() => setExpandidoId(expandido ? null : registro.id)}
+                            title="Ver detalle campo por campo"
+                            className="p-1.5 text-[#525252] hover:bg-[#e0e0e0] transition-colors cursor-pointer"
+                          >
+                            {expandido ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+
+                    {expandido && tieneDetalle && (
+                      <tr className="border-b border-[#e0e0e0] bg-[#f4f4f4]">
+                        <td colSpan={5} className="p-3">
+                          <table className="w-full text-xs border border-[#e0e0e0] bg-white">
+                            <thead>
+                              <tr className="bg-white text-[#525252] uppercase text-[10px] tracking-wide">
+                                <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Campo</th>
+                                <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Antes</th>
+                                <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Después</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {diffs.map(({ campo, antes, despues }) => (
+                                <tr key={campo} className="border-b border-[#e0e0e0] last:border-b-0">
+                                  <td className="p-2 font-semibold text-[#161616] align-top">
+                                    {etiquetaCampo(campo)}
+                                  </td>
+                                  <td className="p-2 text-[#da1e28] align-top">{formatearValor(antes)}</td>
+                                  <td className="p-2 text-[#0e6027] align-top">{formatearValor(despues)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         )}
-
-        {registrosFiltrados.map((registro) => {
-          const config = ACCION_CONFIG[registro.accion];
-          const Icon = config.icon;
-          const expandido = expandidoId === registro.id;
-          const diffs = calcularDiferencias(registro.estadoAnterior, registro.estadoNuevo);
-
-          return (
-            <div key={registro.id}>
-              <button
-                onClick={() => setExpandidoId(expandido ? null : registro.id)}
-                className="w-full flex items-center justify-between gap-4 p-3.5 text-left hover:bg-[#f4f4f4] transition-colors cursor-pointer"
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <span
-                    className={`flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wide shrink-0 ${config.classes}`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{config.label}</span>
-                  </span>
-                  <span className="font-mono font-semibold text-sm text-[#161616] truncate">
-                    {registro.entidadEtiqueta}
-                  </span>
-                </div>
-
-                <div className="flex items-center space-x-4 text-xs text-[#525252] shrink-0">
-                  <span>{registro.usuario}</span>
-                  <span className="font-mono">
-                    {formatearFecha(registro.fecha)}{' '}
-                    {new Date(registro.fecha).toLocaleTimeString('es-AR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                  {expandido ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </div>
-              </button>
-
-              {expandido && (
-                <div className="px-4 pb-4">
-                  {diffs.length === 0 ? (
-                    <p className="text-xs text-[#8d8d8d] italic">
-                      No se registraron cambios de campos para este evento.
-                    </p>
-                  ) : (
-                    <table className="w-full text-xs border border-[#e0e0e0]">
-                      <thead>
-                        <tr className="bg-[#f4f4f4] text-[#525252] uppercase text-[10px] tracking-wide">
-                          <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Campo</th>
-                          <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Antes</th>
-                          <th className="text-left p-2 font-bold border-b border-[#e0e0e0]">Después</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {diffs.map(({ campo, antes, despues }) => (
-                          <tr key={campo} className="border-b border-[#e0e0e0] last:border-b-0">
-                            <td className="p-2 font-semibold text-[#161616] align-top">{campo}</td>
-                            <td className="p-2 text-[#da1e28] align-top">{formatearValor(antes)}</td>
-                            <td className="p-2 text-[#0e6027] align-top">{formatearValor(despues)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
       </div>
     </div>
   );
