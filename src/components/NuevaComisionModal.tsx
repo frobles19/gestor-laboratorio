@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { MedioTransporte, TipoIntervencion } from '../types';
+import { getHoyLocalStr } from '../utils/maintenance';
 
 interface NuevaComisionModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
   const { aeropuertos, nomina, crearComision } = useApp();
 
   // Fechas por defecto sugeridas
-  const hoyStr = new Date().toISOString().split('T')[0];
+  const hoyStr = getHoyLocalStr();
   const enUnaSemanaStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .split('T')[0];
@@ -34,7 +35,7 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
   const [fechaSalida, setFechaSalida] = useState(hoyStr);
   const [fechaRegreso, setFechaRegreso] = useState(enUnaSemanaStr);
   const [medioTransporte, setMedioTransporte] = useState<MedioTransporte>('Terrestre');
-  const [tipoMantenimiento, setTipoMantenimiento] = useState<TipoIntervencion>('Preventivo');
+  const [tiposMantenimiento, setTiposMantenimiento] = useState<TipoIntervencion[]>(['Preventivo']);
   const [detalleOtros, setDetalleOtros] = useState('');
   const [destinosSeleccionados, setDestinosSeleccionados] = useState<string[]>([]);
   const [tecnicosSeleccionados, setTecnicosSeleccionados] = useState<string[]>([]);
@@ -43,6 +44,7 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
   const [busquedaDestino, setBusquedaDestino] = useState('');
   const [busquedaTecnico, setBusquedaTecnico] = useState('');
   const [errorForm, setErrorForm] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   // Lista de aeropuertos filtrada y no seleccionados aún
   const aeropuertosDisponibles = useMemo(() => {
@@ -87,9 +89,18 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
     setTecnicosSeleccionados((prev) => prev.filter((i) => i !== id));
   };
 
+  const toggleTipoMantenimiento = (tipo: TipoIntervencion) => {
+    setTiposMantenimiento((prev) =>
+      prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorForm(null);
+
+    // Evita crear comisiones duplicadas por doble clic mientras se procesa el envío.
+    if (enviando) return;
 
     if (!fechaSalida || !fechaRegreso) {
       setErrorForm('Por favor ingrese las fechas de salida y regreso.');
@@ -111,20 +122,30 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
       return;
     }
 
-    crearComision({
-      fechaSalida,
-      fechaRegreso,
-      medioTransporte,
-      tipoMantenimiento,
-      objetivo:
-        tipoMantenimiento === 'Otros' && detalleOtros.trim()
-          ? detalleOtros.trim()
-          : undefined,
-      destinosAeropuertos: destinosSeleccionados,
-      tecnicosIds: tecnicosSeleccionados,
-    });
+    if (tiposMantenimiento.length === 0) {
+      setErrorForm('Debe seleccionar al menos un tipo de mantenimiento previsto.');
+      return;
+    }
 
-    onClose();
+    setEnviando(true);
+    try {
+      crearComision({
+        fechaSalida,
+        fechaRegreso,
+        medioTransporte,
+        tiposMantenimiento,
+        objetivo:
+          tiposMantenimiento.includes('Otros') && detalleOtros.trim()
+            ? detalleOtros.trim()
+            : undefined,
+        destinosAeropuertos: destinosSeleccionados,
+        tecnicosIds: tecnicosSeleccionados,
+      });
+      onClose();
+    } catch (err) {
+      setErrorForm(err instanceof Error ? err.message : 'No se pudo crear la comisión.');
+      setEnviando(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -226,11 +247,15 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
               </div>
             </div>
 
-            {/* Tipo de Mantenimiento Previsto */}
+            {/* Tipo(s) de Mantenimiento Previsto */}
             <div className="sm:col-span-3">
               <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
-                Tipo de Mantenimiento Previsto *
+                Tipo(s) de Mantenimiento Previsto ({tiposMantenimiento.length} seleccionado
+                {tiposMantenimiento.length === 1 ? '' : 's'}) *
               </label>
+              <p className="text-[11px] text-[#6f6f6f] mb-1.5">
+                Puede seleccionar más de uno si la comisión abarca varios tipos de tarea.
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {(
                   [
@@ -243,9 +268,9 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
                   <button
                     key={tipo}
                     type="button"
-                    onClick={() => setTipoMantenimiento(tipo)}
+                    onClick={() => toggleTipoMantenimiento(tipo)}
                     className={`py-2 px-3 text-xs font-bold border transition-colors cursor-pointer text-center ${
-                      tipoMantenimiento === tipo
+                      tiposMantenimiento.includes(tipo)
                         ? 'bg-[#161616] text-white border-[#161616]'
                         : 'bg-white text-[#161616] border-[#8d8d8d] hover:bg-[#e0e0e0]'
                     }`}
@@ -255,7 +280,7 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
                 ))}
               </div>
 
-              {tipoMantenimiento === 'Otros' && (
+              {tiposMantenimiento.includes('Otros') && (
                 <div className="mt-2.5 bg-white p-3 border border-[#8d8d8d]">
                   <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
                     Especificar Detalle / Motivo del Mantenimiento:
@@ -448,10 +473,11 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex items-center space-x-2 px-5 py-2 bg-[#0f62fe] hover:bg-[#0353e9] text-white text-xs font-semibold tracking-wide shadow-sm transition-colors"
+              disabled={enviando}
+              className="flex items-center space-x-2 px-5 py-2 bg-[#0f62fe] hover:bg-[#0353e9] disabled:bg-[#8d8d8d] disabled:cursor-not-allowed text-white text-xs font-semibold tracking-wide shadow-sm transition-colors"
             >
               <Check className="w-4 h-4" />
-              <span>CREAR COMISIÓN</span>
+              <span>{enviando ? 'CREANDO...' : 'CREAR COMISIÓN'}</span>
             </button>
           </div>
         </form>

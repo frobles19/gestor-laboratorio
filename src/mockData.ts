@@ -13,71 +13,51 @@ export const INITIAL_AEROPUERTOS: Aeropuerto[] = [
     codigoIATA: 'EZE',
     nombreOficial: 'Aeropuerto Internacional Ministro Pistarini',
     region: 'EZEIZA',
-    ciudad: 'Ezeiza',
-    provincia: 'Buenos Aires',
   },
   {
     codigoIATA: 'AEP',
     nombreOficial: 'Aeroparque Jorge Newbery',
     region: 'EZEIZA',
-    ciudad: 'Ciudad Autónoma de Buenos Aires',
-    provincia: 'Buenos Aires',
   },
   {
     codigoIATA: 'COR',
     nombreOficial: 'Aeropuerto Internacional Ing. Ambrosio Taravella',
     region: 'CORDOBA',
-    ciudad: 'Córdoba Capital',
-    provincia: 'Córdoba',
   },
   {
     codigoIATA: 'MDZ',
     nombreOficial: 'Aeropuerto Internacional Gobernador Francisco Gabrielli',
     region: 'MENDOZA',
-    ciudad: 'Las Heras / Mendoza',
-    provincia: 'Mendoza',
   },
   {
     codigoIATA: 'IGR',
     nombreOficial: 'Aeropuerto Internacional Mayor D. Carlos Eduardo Krause',
     region: 'RESISTENCIA',
-    ciudad: 'Puerto Iguazú',
-    provincia: 'Misiones',
   },
   {
     codigoIATA: 'RES',
     nombreOficial: 'Aeropuerto Internacional de Resistencia',
     region: 'RESISTENCIA',
-    ciudad: 'Resistencia',
-    provincia: 'Chaco',
   },
   {
     codigoIATA: 'CRD',
     nombreOficial: 'Aeropuerto Internacional General Enrique Mosconi',
     region: 'COMODORO RIVADAVIA',
-    ciudad: 'Comodoro Rivadavia',
-    provincia: 'Chubut',
   },
   {
     codigoIATA: 'BRC',
     nombreOficial: 'Aeropuerto Internacional Teniente Luis Candelaria',
     region: 'COMODORO RIVADAVIA',
-    ciudad: 'San Carlos de Bariloche',
-    provincia: 'Río Negro',
   },
   {
     codigoIATA: 'SLA',
     nombreOficial: 'Aeropuerto Internacional Martín Miguel de Güemes',
     region: 'CORDOBA',
-    ciudad: 'Salta',
-    provincia: 'Salta',
   },
   {
     codigoIATA: 'USH',
     nombreOficial: 'Aeropuerto Internacional Malvinas Argentinas',
     region: 'COMODORO RIVADAVIA',
-    ciudad: 'Ushuaia',
-    provincia: 'Tierra del Fuego',
   },
 ];
 
@@ -370,8 +350,7 @@ export const INITIAL_COMISIONES: ComisionServicio[] = [
     tecnicosIds: ['TEC-003', 'TEC-006', 'TEC-007'], // Fernández (Coordinador), Benítez, Navarro
     jefeComisionId: 'TEC-003', // Automático: Roberto Daniel Fernández (Coordinador)
     estado: 'En Curso',
-    tipoMantenimiento: 'Preventivo',
-    tipoMantenimientoPrevisto: 'Preventivo',
+    tiposMantenimiento: ['Preventivo'],
     objetivo: 'Mantenimiento Preventivo y Calibración Semestral en radioayudas de Córdoba y Mendoza',
     createdAt: '2026-09-10',
   },
@@ -385,8 +364,7 @@ export const INITIAL_COMISIONES: ComisionServicio[] = [
     tecnicosIds: ['TEC-002', 'TEC-004', 'TEC-008'], // Mariana Gómez (Jefe Lab), Rossi, Romero
     jefeComisionId: 'TEC-002', // Automático: Mariana Gómez (Jefe Laboratorio)
     estado: 'Planificada',
-    tipoMantenimiento: 'Correctivo',
-    tipoMantenimientoPrevisto: 'Correctivo',
+    tiposMantenimiento: ['Correctivo'],
     objetivo: 'Verificación de falla y reemplazo de módulo excitador VOR Resistencia y calibración VOR Iguazú',
     createdAt: '2026-09-15',
   },
@@ -402,8 +380,9 @@ export const INITIAL_COMISIONES: ComisionServicio[] = [
     tecnicosIds: ['TEC-001', 'TEC-005'], // Carlos Méndez (Jefe Dpto), Valeria Castro
     jefeComisionId: 'TEC-001', // Automático: Carlos Méndez (Jefe Departamento)
     estado: 'Finalizada',
-    tipoMantenimiento: 'Verificación',
-    tipoMantenimientoPrevisto: 'Preventivo',
+    // Se planificó como Preventivo pero, según las tareas registradas al cierre
+    // (INT-001 Verificación, INT-002 Preventivo), terminó abarcando ambos tipos.
+    tiposMantenimiento: ['Verificación', 'Preventivo'],
     objetivo: 'Verificación Aérea Anual e Inspección Preventiva de VOR/DME Ezeiza',
     observacionesCierre: 'Comisión ejecutada en tiempo y forma. Parámetros de radiofrecuencia alineados a normas OACI Anexo 10.',
     createdAt: '2026-08-01',
@@ -423,7 +402,6 @@ export const INITIAL_INTERVENCIONES: IntervencionMantenimiento[] = [
       'Coordinación con avión verificador LV-FCE. Calibración de fase 30Hz variable vs 30Hz referencia. Error de azimut residual < 0.8° en 360° de cobertura. Potencia TX1: 100W, TX2: 99.5W.',
     estadoOperativoResultante: 'EN_SERVICIO',
     tareaPendienteProximaVisita: 'Reemplazo preventivo de banco de baterías de respaldo de 24V DC.',
-    tecnicoResponsableId: 'TEC-001',
   },
   {
     id: 'INT-002',
@@ -436,20 +414,6 @@ export const INITIAL_INTERVENCIONES: IntervencionMantenimiento[] = [
       'Alineación de retardo de transpondedor a 50.00 microsegundos (+/- 0.05 us). Medición de eficiencia de respuesta al 85% de interrogación con 1200 pp/s. Limpieza de filtros y verificación de acoplador direccional.',
     estadoOperativoResultante: 'EN_SERVICIO',
     tareaPendienteProximaVisita: '',
-    tecnicoResponsableId: 'TEC-005',
-  },
-  {
-    id: 'INT-003',
-    comisionId: 'COM-2026-001',
-    equipoId: 'EQ-VOR-COR',
-    fechaEjecucion: '2026-09-19',
-    tipoIntervencion: 'Preventivo',
-    tipoPreventivo: 'Trimestral',
-    detalleTecnico:
-      'Mantenimiento trimestral: Verificación de VSWR de antena omnidireccional y 48 antenas de banda lateral (Alford Loop). VSWR medido 1.15. Ajuste de modulador de 9960 Hz subportadora al 30%.',
-    estadoOperativoResultante: 'EN_SERVICIO',
-    tareaPendienteProximaVisita: 'Solicitar 2 módulos preamplificadores RF de repuesto para pañol local.',
-    tecnicoResponsableId: 'TEC-003',
   },
 ];
 
@@ -458,18 +422,8 @@ export const INITIAL_NOVEDADES: NovedadComision[] = [
     id: 'NOV-001',
     comisionId: 'COM-2026-003',
     aeropuertoCodigo: 'EZE',
-    tipo: 'INFRAESTRUCTURA',
     observacion:
       'Se observó fisura menor en el sellado del domo superior de la contraantena del DVOR. Se aplicó sellador poliuretánico provisional, programar mantenimiento civil.',
     fechaRegistro: '2026-08-13',
-  },
-  {
-    id: 'NOV-002',
-    comisionId: 'COM-2026-001',
-    aeropuertoCodigo: 'COR',
-    tipo: 'TECNICA',
-    observacion:
-      'El grupo electrógeno auxiliar de la caseta VOR presentó oscilación de frecuencia (48.5 Hz - 51.2 Hz) durante la prueba con carga. Se notificó al área de Energía.',
-    fechaRegistro: '2026-09-19',
   },
 ];

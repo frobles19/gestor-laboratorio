@@ -5,18 +5,16 @@ import {
   Calendar,
   MapPin,
   Users,
-  Shield,
   Truck,
   Plane,
   Wrench,
   AlertTriangle,
   Printer,
   CheckCircle2,
-  Clock,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ComisionServicio } from '../types';
-import { formatearFecha, JERARQUIA_VALOR } from '../utils/maintenance';
+import { formatearFecha, calcularDiscrepanciaDias } from '../utils/maintenance';
 
 interface DetalleComisionModalProps {
   comision: ComisionServicio;
@@ -41,9 +39,6 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
   );
   const novedadesComision = novedades.filter((n) => n.comisionId === comision.id);
 
-  // Jefe de comisión
-  const jefe = nomina.find((t) => t.id === comision.jefeComisionId);
-
   const imprimirExpediente = () => {
     window.print();
   };
@@ -57,49 +52,33 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
             <div className="bg-[#0f62fe] p-1.5 text-white print:hidden">
               <FileText className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono font-bold bg-[#393939] text-[#82cfff] px-2 py-0.5 print:border print:border-black print:text-black">
-                  EXPEDIENTE {comision.codigo}
-                </span>
-                <span
-                  className={`text-xs px-2 py-0.5 font-bold uppercase ${
-                    comision.estado === 'Finalizada'
-                      ? 'bg-[#defbe6] text-[#0e6027]'
-                      : comision.estado === 'En Curso'
-                      ? 'bg-[#d0e2ff] text-[#002d9c]'
-                      : 'bg-[#f4f4f4] text-[#393939] border border-[#8d8d8d]'
-                  }`}
-                >
-                  {comision.estado}
-                </span>
-                {comision.tipoMantenimiento && (
-                  <span className="text-xs bg-[#0f62fe] text-white px-2 py-0.5 font-semibold">
-                    {comision.tipoMantenimiento}
-                  </span>
-                )}
-                {comision.estado === 'Finalizada' &&
-                  comision.tipoMantenimientoPrevisto &&
-                  comision.tipoMantenimientoPrevisto !== comision.tipoMantenimiento && (
-                    <span className="text-[11px] bg-[#fef3d6] text-[#8a6100] px-2 py-0.5 font-semibold border border-[#fddc69]" title={`Originalmente prevista como ${comision.tipoMantenimientoPrevisto}`}>
-                      Ajustado de: {comision.tipoMantenimientoPrevisto}
-                    </span>
-                  )}
-              </div>
-              <h2 className="text-base font-bold tracking-wide mt-1">
-                {comision.objetivo || 'Comisión Técnica de Mantenimiento de Radioayudas'}
-              </h2>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-mono font-bold bg-[#393939] text-[#82cfff] px-2 py-0.5 print:border print:border-black print:text-black">
+                EXPEDIENTE {comision.codigo}
+              </span>
+              <span
+                className={`text-xs px-2 py-0.5 font-bold uppercase ${
+                  comision.estado === 'Finalizada'
+                    ? 'bg-[#defbe6] text-[#0e6027]'
+                    : comision.estado === 'En Curso'
+                    ? 'bg-[#d0e2ff] text-[#002d9c]'
+                    : comision.estado === 'Cancelada'
+                    ? 'bg-[#fff1f1] text-[#da1e28] border border-[#ffb3b8]'
+                    : 'bg-[#f4f4f4] text-[#393939] border border-[#8d8d8d]'
+                }`}
+              >
+                {comision.estado}
+              </span>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 print:hidden">
             <button
               onClick={imprimirExpediente}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#262626] hover:bg-[#393939] text-white text-xs border border-[#525252] transition-colors"
+              className="p-2 bg-[#262626] hover:bg-[#393939] text-white border border-[#525252] transition-colors"
               title="Imprimir / Exportar Reporte"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir Expediente</span>
+              <Printer className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
@@ -112,92 +91,55 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
 
         {/* Contenido del Expediente */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto print:max-h-none print:overflow-visible">
-          {/* Ficha Principal de Datos */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#f4f4f4] p-4 border border-[#e0e0e0]">
-            {/* Fechas */}
-            <div>
-              <div className="text-[11px] font-bold text-[#6f6f6f] uppercase tracking-wider mb-1 flex items-center space-x-1">
-                <Calendar className="w-3.5 h-3.5 text-[#0f62fe]" />
-                <span>Cronograma Oficial</span>
+          {/* Cronograma Oficial */}
+          <div className="bg-[#f4f4f4] p-4 border border-[#e0e0e0]">
+            <div className="text-[11px] font-bold text-[#6f6f6f] uppercase tracking-wider mb-2 flex items-center space-x-1">
+              <Calendar className="w-3.5 h-3.5 text-[#0f62fe]" />
+              <span>Cronograma Oficial</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-[#161616]">
+              <div>
+                <span className="text-[#525252] block">Fecha de Salida</span>
+                <span className="font-mono font-semibold">
+                  {formatearFecha(comision.fechaSalidaReal || comision.fechaSalida)}
+                </span>
               </div>
-              <div className="text-xs text-[#161616] space-y-1">
-                <div>
-                  <span className="text-[#525252]">Salida Prog:</span>{' '}
-                  <span className="font-mono font-semibold">
-                    {formatearFecha(comision.fechaSalida)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#525252]">Regreso Prog:</span>{' '}
-                  <span className="font-mono font-semibold">
-                    {formatearFecha(comision.fechaRegreso)}
-                  </span>
-                </div>
-                {comision.fechaSalidaReal && (
-                  <div className="text-[#0e6027] font-semibold pt-1 border-t border-[#e0e0e0]">
-                    Ejecución Real: {formatearFecha(comision.fechaSalidaReal)} al{' '}
-                    {formatearFecha(comision.fechaRegresoReal)}
-                  </div>
-                )}
+              <div>
+                <span className="text-[#525252] block">Fecha de Llegada</span>
+                <span className="font-mono font-semibold">
+                  {formatearFecha(comision.fechaRegresoReal || comision.fechaRegreso)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#525252] block">Medio de Transporte</span>
+                <span className="font-bold flex items-center space-x-1.5">
+                  {comision.medioTransporte === 'Aéreo' ? (
+                    <Plane className="w-3.5 h-3.5 text-[#0f62fe]" />
+                  ) : (
+                    <Truck className="w-3.5 h-3.5 text-[#0f62fe]" />
+                  )}
+                  <span>{comision.medioTransporte}</span>
+                </span>
               </div>
             </div>
-
-            {/* Medio de Transporte y Logística */}
-            <div>
-              <div className="text-[11px] font-bold text-[#6f6f6f] uppercase tracking-wider mb-1 flex items-center space-x-1">
-                {comision.medioTransporte === 'Aéreo' ? (
-                  <Plane className="w-3.5 h-3.5 text-[#0f62fe]" />
-                ) : (
-                  <Truck className="w-3.5 h-3.5 text-[#0f62fe]" />
-                )}
-                <span>Logística y Traslado</span>
-              </div>
-              <div className="text-xs text-[#161616] space-y-1">
-                <div>
-                  <span className="text-[#525252]">Medio de Transporte:</span>{' '}
-                  <span className="font-bold">{comision.medioTransporte}</span>
+            {(() => {
+              const discrepancia = calcularDiscrepanciaDias(
+                comision.fechaRegresoReal,
+                comision.fechaRegreso
+              );
+              if (!comision.fechaRegresoReal || discrepancia === 0) return null;
+              return (
+                <div
+                  className={`mt-2.5 pt-2 border-t border-[#e0e0e0] text-xs font-semibold ${
+                    discrepancia > 0 ? 'text-[#da1e28]' : 'text-[#0e6027]'
+                  }`}
+                >
+                  {discrepancia > 0
+                    ? `Se extendió ${discrepancia} día${discrepancia === 1 ? '' : 's'} respecto a lo programado.`
+                    : `Finalizó ${Math.abs(discrepancia)} día${Math.abs(discrepancia) === 1 ? '' : 's'} antes de lo programado.`}
                 </div>
-                <div>
-                  <span className="text-[#525252]">Tipo de Mantenimiento:</span>{' '}
-                  <span className="font-bold text-[#0f62fe]">
-                    {comision.tipoMantenimiento || 'No especificado'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#525252]">Fecha Creación:</span>{' '}
-                  <span className="font-mono">{formatearFecha(comision.createdAt)}</span>
-                </div>
-                {comision.finalizadaAt && (
-                  <div>
-                    <span className="text-[#525252]">Fecha Cierre:</span>{' '}
-                    <span className="font-mono text-[#0e6027]">
-                      {formatearFecha(comision.finalizadaAt)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Jefe de Comisión */}
-            <div className="bg-[#edf5ff] p-3 border-l-4 border-[#0f62fe]">
-              <div className="text-[10px] font-bold text-[#0043ce] uppercase tracking-wider mb-1 flex items-center space-x-1">
-                <Shield className="w-3.5 h-3.5 text-[#0f62fe]" />
-                <span>Jefe de Comisión (Mando)</span>
-              </div>
-              {jefe ? (
-                <div className="text-xs text-[#161616]">
-                  <div className="font-bold text-[#002d9c]">
-                    <span className="uppercase">{jefe.apellido}</span>, {jefe.nombre}
-                  </div>
-                  <div className="text-[11px] text-[#525252]">{jefe.puesto}</div>
-                  <div className="text-[10px] font-mono text-[#6f6f6f]">
-                    DNI: {jefe.dni} • Nivel Jerárquico {JERARQUIA_VALOR[jefe.puesto]}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-[#8d8d8d]">No asignado</div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           {/* Destinos Visitados */}
@@ -250,28 +192,14 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
                       esJefe ? 'bg-[#f0f7ff]' : 'bg-white'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      {esJefe ? (
-                        <span className="bg-[#002d9c] text-white text-[10px] font-bold px-1.5 py-0.5">
-                          JEFE COMISIÓN
-                        </span>
-                      ) : (
-                        <span className="bg-[#e0e0e0] text-[#393939] text-[10px] px-1.5 py-0.5">
-                          TÉCNICO
-                        </span>
-                      )}
-                      <span className="font-semibold text-[#161616]">
-                        <span className="uppercase">{tec.apellido}</span>, {tec.nombre}
-                      </span>
-                      <span className="text-[#6f6f6f] text-[11px]">• DNI: {tec.dni}</span>
-                      <span className="text-[#6f6f6f] text-[11px]">• {tec.email}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-[#0f62fe]">{tec.puesto}</span>
-                      <span className="text-[10px] font-mono text-[#8d8d8d]">
-                        Jerarquía #{JERARQUIA_VALOR[tec.puesto]}
-                      </span>
-                    </div>
+                    <span
+                      className={`font-semibold ${esJefe ? 'text-[#002d9c]' : 'text-[#161616]'}`}
+                    >
+                      <span className="uppercase">{tec.apellido}</span>, {tec.nombre}
+                    </span>
+                    <span className={`font-medium ${esJefe ? 'text-[#002d9c]' : 'text-[#0f62fe]'}`}>
+                      {tec.puesto}
+                    </span>
                   </div>
                 );
               })}
@@ -283,14 +211,14 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-bold text-[#161616] uppercase tracking-wider flex items-center space-x-1.5">
                 <Wrench className="w-4 h-4 text-[#0f62fe]" />
-                <span>Intervenciones y Tareas Técnicas Realizadas ({intervencionesComision.length})</span>
+                <span>Tareas Realizadas ({intervencionesComision.length})</span>
               </h3>
             </div>
 
             {intervencionesComision.length === 0 ? (
               <div className="bg-[#f4f4f4] border border-[#e0e0e0] p-4 text-center text-xs text-[#8d8d8d]">
                 No hay tareas o intervenciones registradas para esta comisión todavía.
-                {comision.estado !== 'Finalizada' && onAbrirCierre && (
+                {comision.estado !== 'Finalizada' && comision.estado !== 'Cancelada' && onAbrirCierre && (
                   <div className="mt-2">
                     <button
                       onClick={onAbrirCierre}
@@ -305,7 +233,6 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
               <div className="border border-[#e0e0e0] divide-y divide-[#e0e0e0]">
                 {intervencionesComision.map((int) => {
                   const eq = equipos.find((e) => e.id === int.equipoId);
-                  const tec = nomina.find((t) => t.id === int.tecnicoResponsableId);
 
                   return (
                     <div key={int.id} className="p-3 bg-white space-y-2 text-xs">
@@ -314,27 +241,18 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
                           <span className="font-mono font-bold bg-[#161616] text-white px-2 py-0.5">
                             {eq?.identificador || int.equipoId}
                           </span>
-                          <span className="font-semibold text-[#0f62fe]">
-                            {int.tipoIntervencion}
+                          <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-xs font-bold">
+                            {int.tipoIntervencion === 'Preventivo' && int.tipoPreventivo
+                              ? int.tipoPreventivo
+                              : int.tipoIntervencion}
                           </span>
-                          {int.tipoPreventivo && (
-                            <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-xs font-bold">
-                              {int.tipoPreventivo}
-                            </span>
-                          )}
-                          {int.subtipoVerificacionAerea && (
-                            <span
-                              className={`px-2 py-0.5 text-xs font-bold border ${
-                                int.subtipoVerificacionAerea === 'Con alarmas'
-                                  ? 'bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]'
-                                  : 'bg-[#defbe6] text-[#0e6027] border-[#a7f0ba]'
-                              }`}
-                            >
-                              {int.subtipoVerificacionAerea}
+                          {int.subtipoVerificacionAerea === 'Con alarmas' && (
+                            <span className="px-2 py-0.5 text-xs font-bold border bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]">
+                              Con alarmas
                             </span>
                           )}
                           <span className="text-[#6f6f6f]">
-                            • Ejecutada: {formatearFecha(int.fechaEjecucion)}
+                            • {formatearFecha(int.fechaEjecucion)}
                           </span>
                         </div>
                         <span
@@ -350,7 +268,7 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
 
                       <div className="bg-[#f4f4f4] p-2.5 font-mono text-[11px] text-[#161616] border border-[#e0e0e0]">
                         <span className="font-bold text-[#0043ce] block mb-0.5 font-sans uppercase text-[10px]">
-                          Parámetros Técnicos, Calibraciones y Mediciones:
+                          Detalles Técnicos:
                         </span>
                         {int.detalleTecnico}
                       </div>
@@ -364,12 +282,6 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
                           </span>
                         </div>
                       )}
-
-                      {tec && (
-                        <div className="text-[10px] text-[#6f6f6f]">
-                          Técnico actuante: {tec.apellido}, {tec.nombre} ({tec.puesto})
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -381,7 +293,7 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
           <div>
             <h3 className="text-xs font-bold text-[#161616] uppercase tracking-wider mb-2 flex items-center space-x-1.5">
               <FileText className="w-4 h-4 text-[#0f62fe]" />
-              <span>Novedades Técnicas y de Infraestructura ({novedadesComision.length})</span>
+              <span>Novedades ({novedadesComision.length})</span>
             </h3>
 
             {novedadesComision.length === 0 ? (
@@ -391,31 +303,32 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
               </div>
             ) : (
               <div className="border border-[#e0e0e0] divide-y divide-[#e0e0e0]">
-                {novedadesComision.map((nov) => (
-                  <div key={nov.id} className="p-3 bg-white text-xs">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-mono font-bold bg-[#0f62fe] text-white px-2 py-0.5">
-                        {nov.aeropuertoCodigo}
-                      </span>
-                      <span className="font-semibold text-[#161616]">{nov.tipo}</span>
-                      <span className="text-[#6f6f6f]">
-                        • Fecha: {formatearFecha(nov.fechaRegistro)}
-                      </span>
+                {novedadesComision.map((nov) => {
+                  const aero = aeropuertos.find((a) => a.codigoIATA === nov.aeropuertoCodigo);
+                  return (
+                    <div key={nov.id} className="p-3 bg-white text-xs">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-mono font-bold bg-[#161616] text-white px-2 py-0.5">
+                          {aero?.nombreOficial || nov.aeropuertoCodigo}
+                        </span>
+                      </div>
+                      <p className="text-[#525252]">{nov.observacion}</p>
                     </div>
-                    <p className="text-[#525252]">{nov.observacion}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Observaciones de Cierre si está finalizada */}
-          {comision.observacionesCierre && (
-            <div className="bg-[#edf5ff] p-3 border-l-4 border-[#0f62fe] text-xs">
-              <span className="font-bold text-[#0043ce] block uppercase mb-1">
-                Conclusiones y Observaciones Finales de Cierre:
+          {/* Motivo de cancelación si fue cancelada */}
+          {comision.estado === 'Cancelada' && (
+            <div className="bg-[#fff1f1] p-3 border-l-4 border-[#da1e28] text-xs">
+              <span className="font-bold text-[#da1e28] block uppercase mb-1">
+                Comisión Cancelada{comision.canceladaAt ? ` (${formatearFecha(comision.canceladaAt)})` : ''}:
               </span>
-              <p className="text-[#161616]">{comision.observacionesCierre}</p>
+              <p className="text-[#161616]">
+                {comision.motivoCancelacion || 'No se registró un motivo de cancelación.'}
+              </p>
             </div>
           )}
         </div>
@@ -427,7 +340,7 @@ export const DetalleComisionModal: React.FC<DetalleComisionModalProps> = ({
           </span>
 
           <div className="flex items-center space-x-3">
-            {comision.estado !== 'Finalizada' && onAbrirCierre && (
+            {comision.estado !== 'Finalizada' && comision.estado !== 'Cancelada' && onAbrirCierre && (
               <button
                 type="button"
                 onClick={onAbrirCierre}

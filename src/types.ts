@@ -9,8 +9,6 @@ export interface Aeropuerto {
   codigoIATA: string; // 3 letras, ej: EZE, AEP, COR
   nombreOficial: string;
   region: RegionAeronautica;
-  ciudad?: string;
-  provincia?: string;
 }
 
 export type SistemaRadioayuda = 'VOR' | 'DME' | 'ILS';
@@ -56,7 +54,7 @@ export interface Tecnico {
 
 export type MedioTransporte = 'Terrestre' | 'Aéreo';
 
-export type EstadoComision = 'Planificada' | 'En Curso' | 'Finalizada';
+export type EstadoComision = 'Planificada' | 'En Curso' | 'Finalizada' | 'Cancelada';
 
 export interface ComisionServicio {
   id: string;
@@ -70,23 +68,23 @@ export interface ComisionServicio {
   tecnicosIds: string[];
   jefeComisionId: string; // Calculado automáticamente por jerarquía
   estado: EstadoComision;
-  tipoMantenimiento?: string;
-  tiposMantenimiento?: TipoIntervencion[];
-  tipoMantenimientoPrevisto?: TipoIntervencion; // Tipo originalmente elegido en la planificación
+  // Tipo(s) de mantenimiento de la comisión: al crearla contiene un único valor
+  // (el previsto/planificado); al cerrarla se reemplaza por los tipos realmente
+  // ejecutados en las tareas registradas (puede haber más de uno).
+  tiposMantenimiento: TipoIntervencion[];
   objetivo?: string;
   observacionesCierre?: string;
   createdAt: string;
   finalizadaAt?: string;
+  canceladaAt?: string;
+  motivoCancelacion?: string;
 }
 
-export type TipoIntervencion = 
-  | 'Verificación' 
-  | 'Preventivo' 
+export type TipoIntervencion =
+  | 'Verificación'
+  | 'Preventivo'
   | 'Correctivo'
-  | 'Otros'
-  | 'Verificación Aérea' 
-  | 'Mantenimiento Preventivo' 
-  | 'Mantenimiento Correctivo';
+  | 'Otros';
 
 export type PeriodicidadMantenimientoPreventivo =
   | 'Mensual'
@@ -109,16 +107,12 @@ export interface IntervencionMantenimiento {
   detalleTecnico: string; // Tareas realizadas, calibraciones, mediciones
   estadoOperativoResultante: EstadoOperativo;
   tareaPendienteProximaVisita?: string; // Repuestos necesarios, obras de infraestructura, etc.
-  tecnicoResponsableId?: string;
 }
-
-export type TipoNovedad = 'TECNICA' | 'INFRAESTRUCTURA' | 'OPERATIVA';
 
 export interface NovedadComision {
   id: string;
   comisionId: string;
   aeropuertoCodigo: string; // IATA
-  tipo: TipoNovedad;
   observacion: string;
   fechaRegistro: string;
 }

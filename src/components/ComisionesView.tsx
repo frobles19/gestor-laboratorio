@@ -14,12 +14,15 @@ import {
   Wrench,
   ChevronDown,
   Clock,
+  Ban,
+  Trash2,
+  AlertCircle,
+  Pencil,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
   ComisionServicio,
   EstadoComision,
-  TipoIntervencion,
   MedioTransporte,
 } from '../types';
 import {
@@ -31,12 +34,20 @@ import { CierreComisionWizard } from './CierreComisionWizard';
 import { DetalleComisionModal } from './DetalleComisionModal';
 
 export const ComisionesView: React.FC = () => {
-  const { comisiones, aeropuertos, nomina, intervenciones, cambiarEstadoComision } = useApp();
+  const { comisiones, aeropuertos, nomina, cancelarComision, eliminarComision } = useApp();
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
   // Estados de Modales
   const [modalNuevoOpen, setModalNuevoOpen] = useState(false);
   const [comisionParaCerrar, setComisionParaCerrar] = useState<ComisionServicio | null>(null);
   const [comisionParaDetalle, setComisionParaDetalle] = useState<ComisionServicio | null>(null);
+
+  // Modal de Cancelar/Eliminar Comisión (el botón "Eliminar" abre una elección entre ambas acciones)
+  const [comisionParaAccion, setComisionParaAccion] = useState<ComisionServicio | null>(null);
+  const [pasoAccion, setPasoAccion] = useState<'elegir' | 'confirmarCancelar' | 'confirmarEliminar'>(
+    'elegir'
+  );
+  const [motivoCancelacionInput, setMotivoCancelacionInput] = useState('');
 
   // Filtro superior principal: Tipo de Mantenimiento (selección múltiple)
   const TODOS_TIPOS_MANTENIMIENTO = [
@@ -65,7 +76,7 @@ export const ComisionesView: React.FC = () => {
 
   // Filtros de selección múltiple para Transporte y Estado
   const TODOS_TRANSPORTES: MedioTransporte[] = ['Terrestre', 'Aéreo'];
-  const TODOS_ESTADOS: EstadoComision[] = ['Planificada', 'En Curso', 'Finalizada'];
+  const TODOS_ESTADOS: EstadoComision[] = ['Planificada', 'En Curso', 'Finalizada', 'Cancelada'];
 
   const [filtrosTransporte, setFiltrosTransporte] = useState<MedioTransporte[]>([
     ...TODOS_TRANSPORTES,
@@ -159,69 +170,28 @@ export const ComisionesView: React.FC = () => {
     });
   };
 
-  // Función auxiliar para determinar qué tipos de mantenimiento aplica a cada comisión
-  const mapearTipo = (val?: string): OpcionTipoMantenimiento => {
-    if (!val) return 'Otros';
-    const v = val.toLowerCase();
-    if (v.includes('verificaci') || v.includes('aérea') || v.includes('aerea')) return 'Verificación';
-    if (v.includes('preventivo') || v.includes('semestral') || v.includes('trimestral') || v.includes('anual') || v.includes('calibraci')) return 'Preventivo';
-    if (v.includes('correctivo') || v.includes('falla') || v.includes('reemplazo') || v.includes('reparaci')) return 'Correctivo';
-    return 'Otros';
-  };
+  // Tipos de mantenimiento de la comisión: se leen directamente del campo estructurado
+  // (ya no se infieren por coincidencia de texto libre en el objetivo, que era frágil
+  // ante errores de tipeo o redacciones no previstas).
+  const obtenerTiposComision = (com: ComisionServicio): OpcionTipoMantenimiento[] =>
+    com.tiposMantenimiento.length > 0 ? com.tiposMantenimiento : ['Otros'];
 
-  const obtenerTiposComision = (com: ComisionServicio): OpcionTipoMantenimiento[] => {
-    const setTipos = new Set<OpcionTipoMantenimiento>();
-    if (com.tipoMantenimiento) {
-      com.tipoMantenimiento.split(',').forEach((sub) => {
-        setTipos.add(mapearTipo(sub.trim()));
-      });
-    }
-    const tareas = intervenciones.filter((i) => i.comisionId === com.id);
-    tareas.forEach((t) => {
-      setTipos.add(mapearTipo(t.tipoIntervencion));
-    });
-
-    const obj = (com.objetivo || '').toLowerCase();
-    if (obj.includes('verificaci') || obj.includes('aérea') || obj.includes('aerea')) {
-      setTipos.add('Verificación');
-    }
-    if (
-      obj.includes('preventivo') ||
-      obj.includes('semestral') ||
-      obj.includes('trimestral') ||
-      obj.includes('anual') ||
-      obj.includes('calibraci')
-    ) {
-      setTipos.add('Preventivo');
-    }
-    if (
-      obj.includes('correctivo') ||
-      obj.includes('falla') ||
-      obj.includes('reemplazo') ||
-      obj.includes('reparaci')
-    ) {
-      setTipos.add('Correctivo');
-    }
-    if (setTipos.size === 0) {
-      setTipos.add('Otros');
-    }
-    return Array.from(setTipos);
-  };
-
-  // Estadísticas KPI por Estado de Comisión (Totales, Planificadas, En Curso, Finalizadas)
+  // Estadísticas KPI por Estado de Comisión (Totales, Planificadas, En Curso, Finalizadas, Canceladas)
   const statsEstado = useMemo(() => {
     const total = comisiones.length;
     let planificada = 0;
     let enCurso = 0;
     let finalizada = 0;
+    let cancelada = 0;
 
     comisiones.forEach((com) => {
       if (com.estado === 'Planificada') planificada++;
       else if (com.estado === 'En Curso') enCurso++;
       else if (com.estado === 'Finalizada') finalizada++;
+      else if (com.estado === 'Cancelada') cancelada++;
     });
 
-    return { total, planificada, enCurso, finalizada };
+    return { total, planificada, enCurso, finalizada, cancelada };
   }, [comisiones]);
 
   // Flag de si hay algún filtro activo
@@ -287,12 +257,6 @@ export const ComisionesView: React.FC = () => {
             const aero = aeropuertos.find(
               (a) => a.codigoIATA.toLowerCase() === d.toLowerCase()
             );
-            const ciudadNorm = aero?.ciudad
-              ? aero.ciudad
-                  .toLowerCase()
-                  .normalize('NFD')
-                  .replace(/[\u0300-\u036f]/g, '')
-              : '';
             const nombreNorm = aero?.nombreOficial
               ? aero.nombreOficial
                   .toLowerCase()
@@ -300,11 +264,7 @@ export const ComisionesView: React.FC = () => {
                   .replace(/[\u0300-\u036f]/g, '')
               : '';
 
-            return (
-              dNorm.includes(term) ||
-              ciudadNorm.includes(term) ||
-              nombreNorm.includes(term)
-            );
+            return dNorm.includes(term) || nombreNorm.includes(term);
           });
         });
 
@@ -372,7 +332,6 @@ export const ComisionesView: React.FC = () => {
   }, [
     comisiones,
     aeropuertos,
-    intervenciones,
     filtrosTipoMantenimiento,
     filtroFechaDesde,
     filtroFechaHasta,
@@ -388,8 +347,57 @@ export const ComisionesView: React.FC = () => {
     setComisionParaCerrar(com);
   };
 
+  const abrirAccionesComision = (com: ComisionServicio) => {
+    setComisionParaAccion(com);
+    setPasoAccion('elegir');
+    setMotivoCancelacionInput('');
+  };
+
+  const cerrarAccionesComision = () => {
+    setComisionParaAccion(null);
+    setPasoAccion('elegir');
+    setMotivoCancelacionInput('');
+  };
+
+  const confirmarCancelacion = () => {
+    if (!comisionParaAccion) return;
+    try {
+      cancelarComision(comisionParaAccion.id, motivoCancelacionInput.trim() || undefined);
+      setErrorAccion(null);
+    } catch (err) {
+      setErrorAccion(err instanceof Error ? err.message : 'No se pudo cancelar la comisión.');
+    }
+    cerrarAccionesComision();
+  };
+
+  const confirmarEliminacion = () => {
+    if (!comisionParaAccion) return;
+    try {
+      eliminarComision(comisionParaAccion.id);
+      setErrorAccion(null);
+    } catch (err) {
+      setErrorAccion(err instanceof Error ? err.message : 'No se pudo eliminar la comisión.');
+    }
+    cerrarAccionesComision();
+  };
+
   return (
     <div className="space-y-4">
+      {errorAccion && (
+        <div className="bg-[#fff1f1] border-l-4 border-[#da1e28] p-3 text-xs text-[#da1e28] flex items-center justify-between space-x-2">
+          <span className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorAccion}</span>
+          </span>
+          <button
+            onClick={() => setErrorAccion(null)}
+            className="text-[#da1e28] hover:bg-[#ffb3b8] p-1 shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Primer Renglón: Título, Total de Comisiones y Acción Nueva Comisión */}
       <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -434,8 +442,8 @@ export const ComisionesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Segundo Renglón: KPI Cards de Estados (Planificadas, En Curso, Finalizadas) uno al lado del otro */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Segundo Renglón: KPI Cards de Estados (Planificadas, En Curso, Finalizadas, Canceladas) uno al lado del otro */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Planificadas */}
         <button
           onClick={() => toggleFiltroCardEstado('Planificada')}
@@ -494,6 +502,25 @@ export const ComisionesView: React.FC = () => {
             {statsEstado.finalizada}
           </div>
           <div className="text-xs text-[#525252] mt-1">Cerradas y cumplimentadas</div>
+        </button>
+
+        {/* 4. Canceladas */}
+        <button
+          onClick={() => toggleFiltroCardEstado('Cancelada')}
+          className={`p-3.5 text-left border transition-all cursor-pointer ${
+            filtrosEstado.length === 1 && filtrosEstado[0] === 'Cancelada'
+              ? 'bg-white border-[#da1e28] shadow-xs ring-1 ring-[#da1e28]'
+              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
+          }`}
+        >
+          <div className="text-xs uppercase font-bold text-[#da1e28] tracking-wider flex items-center justify-between">
+            <span>Canceladas</span>
+            <X className="w-4 h-4 text-[#da1e28]" />
+          </div>
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-[#da1e28] mt-1">
+            {statsEstado.cancelada}
+          </div>
+          <div className="text-xs text-[#525252] mt-1">No se realizaron</div>
         </button>
       </div>
 
@@ -764,6 +791,11 @@ export const ComisionesView: React.FC = () => {
                 </tr>
               ) : (
                 comisionesFiltradas.map((com) => {
+                  // Reglas de habilitación de acciones según el estado de la comisión.
+                  // Los botones siempre se muestran; solo cambia si están habilitados.
+                  const puedeCerrar = com.estado === 'Planificada' || com.estado === 'En Curso';
+                  const puedeCancelarOEliminar = com.estado !== 'Finalizada';
+
                   return (
                     <tr
                       key={com.id}
@@ -856,6 +888,8 @@ export const ComisionesView: React.FC = () => {
                               ? 'bg-[#defbe6] text-[#0e6027] border border-[#a7f0ba]'
                               : com.estado === 'En Curso'
                               ? 'bg-[#d0e2ff] text-[#002d9c] border border-[#a6c8ff]'
+                              : com.estado === 'Cancelada'
+                              ? 'bg-[#fff1f1] text-[#da1e28] border border-[#ffb3b8]'
                               : 'bg-[#fef3d6] text-[#8a6100] border border-[#fddc69]'
                           }`}
                         >
@@ -863,10 +897,10 @@ export const ComisionesView: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* 6. Acciones: Solo dibujos/iconos sin texto */}
+                      {/* 6. Acciones: siempre visibles; según el estado quedan deshabilitadas (color gris) */}
                       <td className="py-3 px-3.5 text-center">
                         <div className="flex items-center justify-center space-x-1.5">
-                          {/* Botón Ver Expediente */}
+                          {/* Ver Expediente: disponible para cualquier estado */}
                           <button
                             onClick={() => setComisionParaDetalle(com)}
                             title="Ver Expediente"
@@ -875,27 +909,50 @@ export const ComisionesView: React.FC = () => {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Botón Cerrar Comisión (Guía interactiva) */}
-                          {com.estado !== 'Finalizada' && (
-                            <button
-                              onClick={() => setComisionParaCerrar(com)}
-                              title="Cerrar Comisión"
-                              className="p-2 bg-[#0f62fe] hover:bg-[#0353e9] text-white transition-colors cursor-pointer"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          {/* Cerrar Comisión: solo Planificada / En Curso */}
+                          <button
+                            onClick={() => puedeCerrar && setComisionParaCerrar(com)}
+                            disabled={!puedeCerrar}
+                            title={
+                              puedeCerrar
+                                ? 'Cerrar Comisión'
+                                : `No disponible: la comisión está ${com.estado.toLowerCase()}`
+                            }
+                            className={
+                              puedeCerrar
+                                ? 'p-2 bg-[#0f62fe] hover:bg-[#0353e9] text-white transition-colors cursor-pointer'
+                                : 'p-2 bg-[#f4f4f4] text-[#c6c6c6] border border-[#e0e0e0] cursor-not-allowed'
+                            }
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
 
-                          {/* Si está planificada, botón Iniciar */}
-                          {com.estado === 'Planificada' && (
-                            <button
-                              onClick={() => cambiarEstadoComision(com.id, 'En Curso')}
-                              title="Iniciar Comisión"
-                              className="p-2 bg-[#262626] hover:bg-[#393939] text-[#82cfff] transition-colors cursor-pointer"
-                            >
-                              <Play className="w-4 h-4" />
-                            </button>
-                          )}
+                          {/* Editar Comisión: funcionalidad pendiente de implementar */}
+                          <button
+                            disabled
+                            title="Editar Comisión (disponible próximamente)"
+                            className="p-2 bg-[#f4f4f4] text-[#c6c6c6] border border-[#e0e0e0] cursor-not-allowed"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+
+                          {/* Eliminar Comisión: abre la elección entre Cancelar y Eliminar definitivamente */}
+                          <button
+                            onClick={() => puedeCancelarOEliminar && abrirAccionesComision(com)}
+                            disabled={!puedeCancelarOEliminar}
+                            title={
+                              puedeCancelarOEliminar
+                                ? 'Cancelar o Eliminar Comisión'
+                                : 'No disponible: la comisión ya está finalizada'
+                            }
+                            className={
+                              puedeCancelarOEliminar
+                                ? 'p-2 bg-white hover:bg-[#da1e28] text-[#da1e28] hover:text-white border border-[#ffb3b8] transition-colors cursor-pointer'
+                                : 'p-2 bg-[#f4f4f4] text-[#c6c6c6] border border-[#e0e0e0] cursor-not-allowed'
+                            }
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -941,6 +998,133 @@ export const ComisionesView: React.FC = () => {
           onClose={() => setComisionParaDetalle(null)}
           onAbrirCierre={() => abrirCierreDesdeDetalle(comisionParaDetalle)}
         />
+      )}
+
+      {/* Modal Cancelar / Eliminar Comisión */}
+      {comisionParaAccion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white border border-[#393939] shadow-2xl w-full max-w-sm rounded-none overflow-hidden">
+            <div className="bg-[#161616] text-white px-5 py-3 flex items-center justify-between border-b border-[#393939]">
+              <div>
+                <h2 className="text-sm font-semibold tracking-wide uppercase">
+                  {pasoAccion === 'elegir' && 'Cancelar / Eliminar Comisión'}
+                  {pasoAccion === 'confirmarCancelar' && 'Confirmar Cancelación'}
+                  {pasoAccion === 'confirmarEliminar' && 'Confirmar Eliminación'}
+                </h2>
+                <p className="text-xs text-[#a8a8a8]">{comisionParaAccion.codigo}</p>
+              </div>
+              <button
+                onClick={cerrarAccionesComision}
+                className="text-[#a8a8a8] hover:text-white p-1 hover:bg-[#393939] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {pasoAccion === 'elegir' && (
+              <>
+                <div className="p-5 space-y-3">
+                  <p className="text-xs text-[#525252]">
+                    Elija qué acción desea realizar sobre esta comisión:
+                  </p>
+
+                  <button
+                    disabled={comisionParaAccion.estado === 'Cancelada'}
+                    onClick={() => setPasoAccion('confirmarCancelar')}
+                    className={`w-full flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border transition-colors ${
+                      comisionParaAccion.estado === 'Cancelada'
+                        ? 'bg-[#f4f4f4] text-[#c6c6c6] border-[#e0e0e0] cursor-not-allowed'
+                        : 'bg-white text-[#8a6100] border-[#fddc69] hover:bg-[#fef3d6] cursor-pointer'
+                    }`}
+                  >
+                    <Ban className="w-4 h-4 shrink-0" />
+                    <span>
+                      {comisionParaAccion.estado === 'Cancelada'
+                        ? 'Cancelar Comisión (ya está cancelada)'
+                        : 'Cancelar Comisión (no se realizó)'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setPasoAccion('confirmarEliminar')}
+                    className="w-full flex items-center space-x-2 px-4 py-2.5 bg-white text-[#da1e28] border border-[#ffb3b8] hover:bg-[#fff1f1] text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4 shrink-0" />
+                    <span>Eliminar Permanentemente</span>
+                  </button>
+                </div>
+                <div className="bg-[#f4f4f4] px-5 py-3 border-t border-[#e0e0e0] flex justify-end">
+                  <button
+                    onClick={cerrarAccionesComision}
+                    className="px-3 py-1.5 border border-[#8d8d8d] text-xs font-medium text-[#161616] hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {pasoAccion === 'confirmarCancelar' && (
+              <>
+                <div className="p-5 space-y-3">
+                  <p className="text-xs text-[#525252]">
+                    La comisión quedará registrada como <strong>Cancelada</strong> y no podrá
+                    reactivarse. Puede indicar el motivo (opcional):
+                  </p>
+                  <textarea
+                    value={motivoCancelacionInput}
+                    onChange={(e) => setMotivoCancelacionInput(e.target.value)}
+                    rows={3}
+                    placeholder="Ej: Se pospuso por condiciones climáticas..."
+                    className="w-full bg-white border border-[#8d8d8d] p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe]"
+                  />
+                </div>
+                <div className="bg-[#f4f4f4] px-5 py-3 border-t border-[#e0e0e0] flex justify-between">
+                  <button
+                    onClick={() => setPasoAccion('elegir')}
+                    className="px-3 py-1.5 border border-[#8d8d8d] text-xs font-medium text-[#161616] hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={confirmarCancelacion}
+                    className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#8a6100] hover:bg-[#6f4e00] text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>Confirmar Cancelación</span>
+                  </button>
+                </div>
+              </>
+            )}
+
+            {pasoAccion === 'confirmarEliminar' && (
+              <>
+                <div className="p-5 space-y-3">
+                  <p className="text-xs text-[#da1e28]">
+                    <strong>Esta acción no se puede deshacer.</strong> Se eliminará
+                    definitivamente la comisión {comisionParaAccion.codigo} y toda tarea o
+                    novedad asociada.
+                  </p>
+                </div>
+                <div className="bg-[#f4f4f4] px-5 py-3 border-t border-[#e0e0e0] flex justify-between">
+                  <button
+                    onClick={() => setPasoAccion('elegir')}
+                    className="px-3 py-1.5 border border-[#8d8d8d] text-xs font-medium text-[#161616] hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={confirmarEliminacion}
+                    className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#da1e28] hover:bg-[#a2191f] text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sí, Eliminar</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

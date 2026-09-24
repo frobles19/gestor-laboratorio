@@ -23,9 +23,8 @@ import {
   PeriodicidadMantenimientoPreventivo,
   SubtipoVerificacionAerea,
   EstadoOperativo,
-  TipoNovedad,
 } from '../types';
-import { formatearFecha } from '../utils/maintenance';
+import { formatearFecha, getHoyLocalStr } from '../utils/maintenance';
 
 interface CierreComisionWizardProps {
   comision: ComisionServicio;
@@ -43,12 +42,10 @@ interface TareaEquipoDraft {
   detalleTecnico: string;
   estadoOperativoResultante: EstadoOperativo;
   tareaPendienteProximaVisita: string;
-  tecnicoResponsableId: string;
 }
 
 interface NovedadDraft {
   aeropuertoCodigo: string;
-  tipo: TipoNovedad;
   observacion: string;
   fechaRegistro: string;
 }
@@ -61,7 +58,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
 }) => {
   const { equipos, aeropuertos, nomina, cerrarComisionConFlujo } = useApp();
 
-  const hoyStr = new Date().toISOString().split('T')[0];
+  const hoyStr = getHoyLocalStr();
 
   // Estado del Wizard: Pasos 1 a 4
   const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4>(1);
@@ -115,9 +112,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
   );
   const [draftFecha, setDraftFecha] = useState<string>(hoyStr);
   const [draftTipo, setDraftTipo] = useState<TipoIntervencion>(
-    (comision.tipoMantenimientoPrevisto as TipoIntervencion) ||
-      (comision.tipoMantenimiento as TipoIntervencion) ||
-      'Preventivo'
+    comision.tiposMantenimiento[0] || 'Preventivo'
   );
   const [draftTipoPreventivo, setDraftTipoPreventivo] =
     useState<PeriodicidadMantenimientoPreventivo>('Mensual');
@@ -127,9 +122,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
   const [draftEstadoResultante, setDraftEstadoResultante] =
     useState<EstadoOperativo>('EN_SERVICIO');
   const [draftPendiente, setDraftPendiente] = useState<string>('');
-  const [draftTecnicoId, setDraftTecnicoId] = useState<string>(
-    comision.jefeComisionId || comision.tecnicosIds[0] || ''
-  );
 
   // Paso 3: Novedades técnicas y de infraestructura
   const [novedadesRegistradas, setNovedadesRegistradas] = useState<NovedadDraft[]>([]);
@@ -138,7 +130,16 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
   );
   const [draftNovObs, setDraftNovObs] = useState<string>('');
 
+  // Si el aeropuerto elegido para la novedad deja de estar entre los efectivamente
+  // visitados (se quitó por fuerza mayor en el Paso 1), se reajusta la selección.
+  useEffect(() => {
+    if (!destinosVisitados.includes(draftNovAeropuerto)) {
+      setDraftNovAeropuerto(destinosVisitados[0] || '');
+    }
+  }, [destinosVisitados]);
+
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
   if (!isOpen) return null;
 
@@ -148,12 +149,9 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
       setErrorPaso('Seleccione un equipo para registrar la intervención.');
       return;
     }
-    const isCorrectivo =
-      draftTipo === 'Correctivo' || (draftTipo as any) === 'Mantenimiento Correctivo';
-    const isPreventivo =
-      draftTipo === 'Preventivo' || (draftTipo as any) === 'Mantenimiento Preventivo';
-    const isVerificacion =
-      draftTipo === 'Verificación' || (draftTipo as any) === 'Verificación Aérea';
+    const isCorrectivo = draftTipo === 'Correctivo';
+    const isPreventivo = draftTipo === 'Preventivo';
+    const isVerificacion = draftTipo === 'Verificación';
 
     if (isCorrectivo && !draftDetalle.trim()) {
       setErrorPaso(
@@ -188,7 +186,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
         detalleTecnico: detalleFinal,
         estadoOperativoResultante: draftEstadoResultante,
         tareaPendienteProximaVisita: draftPendiente.trim(),
-        tecnicoResponsableId: draftTecnicoId,
       },
     ]);
 
@@ -213,7 +210,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
       ...prev,
       {
         aeropuertoCodigo: draftNovAeropuerto,
-        tipo: 'TECNICA',
         observacion: draftNovObs.trim(),
         fechaRegistro: hoyStr,
       },
@@ -253,20 +249,28 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
 
   // Finalizar cierre definitivo
   const handleConfirmarCierre = () => {
-    cerrarComisionConFlujo({
-      comisionId: comision.id,
-      fechaSalidaReal,
-      fechaRegresoReal,
-      destinosVisitados,
-      observacionesCierre:
-        observacionesCierre.trim() ||
-        `Cierre técnico formal de comisión ${comision.codigo}. Intervenciones registradas en sistema.`,
-      intervencionesNuevas: tareasRegistradas,
-      novedadesNuevas: novedadesRegistradas,
-    });
+    // Evita reenvíos duplicados por doble clic y re-cierres si el flujo se dispara dos veces.
+    if (enviando) return;
+    setEnviando(true);
+    try {
+      cerrarComisionConFlujo({
+        comisionId: comision.id,
+        fechaSalidaReal,
+        fechaRegresoReal,
+        destinosVisitados,
+        observacionesCierre:
+          observacionesCierre.trim() ||
+          `Cierre técnico formal de comisión ${comision.codigo}. Intervenciones registradas en sistema.`,
+        intervencionesNuevas: tareasRegistradas,
+        novedadesNuevas: novedadesRegistradas,
+      });
 
-    if (onComisionCerrada) onComisionCerrada();
-    onClose();
+      if (onComisionCerrada) onComisionCerrada();
+      onClose();
+    } catch (err) {
+      setErrorPaso(err instanceof Error ? err.message : 'No se pudo cerrar la comisión.');
+      setEnviando(false);
+    }
   };
 
   return (
@@ -531,7 +535,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                 <div className="text-xs font-bold text-[#0043ce] uppercase tracking-wider flex items-center justify-between">
                   <span>Nueva Intervención Técnica</span>
                   <span className="text-[11px] font-normal text-[#525252]">
-                    Equipos de {comision.destinosAeropuertos.join(', ')}
+                    Equipos de {destinosVisitados.join(', ')}
                   </span>
                 </div>
 
@@ -590,7 +594,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                 </div>
 
                 {/* Subtipo condicional según el tipo de intervención */}
-                {(draftTipo === 'Preventivo' || (draftTipo as any) === 'Mantenimiento Preventivo') && (
+                {draftTipo === 'Preventivo' && (
                   <div className="bg-[#edf5ff] p-3 border border-[#b9d3ff]">
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-xs font-bold text-[#002d9c] uppercase">
@@ -621,7 +625,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                   </div>
                 )}
 
-                {(draftTipo === 'Verificación' || (draftTipo as any) === 'Verificación Aérea') && (
+                {draftTipo === 'Verificación' && (
                   <div className="bg-[#edf5ff] p-3 border border-[#b9d3ff]">
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-xs font-bold text-[#002d9c] uppercase">
@@ -661,28 +665,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Técnico responsable */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
-                      Técnico Responsable de la Tarea
-                    </label>
-                    <select
-                      value={draftTecnicoId}
-                      onChange={(e) => setDraftTecnicoId(e.target.value)}
-                      className="w-full bg-white border border-[#8d8d8d] px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe]"
-                    >
-                      {comision.tecnicosIds.map((tid) => {
-                        const tec = nomina.find((n) => n.id === tid);
-                        return (
-                          <option key={tid} value={tid}>
-                            {tec?.apellido.toUpperCase()}, {tec?.nombre} ({tec?.puesto})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
+                <div className="grid grid-cols-1 gap-3">
                   {/* Estado operativo resultante */}
                   <div>
                     <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
@@ -710,14 +693,10 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-[#161616] uppercase">
                       Detalle Técnico{' '}
-                      {draftTipo === 'Correctivo' ||
-                      (draftTipo as any) === 'Mantenimiento Correctivo' ||
-                      draftTipo === 'Otros'
-                        ? '*'
-                        : '(Opcional)'}
+                      {draftTipo === 'Correctivo' || draftTipo === 'Otros' ? '*' : '(Opcional)'}
                     </label>
                     <span className="text-[11px] text-[#525252]">
-                      {draftTipo === 'Correctivo' || (draftTipo as any) === 'Mantenimiento Correctivo'
+                      {draftTipo === 'Correctivo'
                         ? 'Obligatorio para correctivos'
                         : draftTipo === 'Otros'
                         ? 'Obligatorio para tipo Otros'
@@ -729,7 +708,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                     onChange={(e) => setDraftDetalle(e.target.value)}
                     rows={2}
                     placeholder={
-                      draftTipo === 'Correctivo' || (draftTipo as any) === 'Mantenimiento Correctivo'
+                      draftTipo === 'Correctivo'
                         ? 'Describa la falla, diagnóstico, componentes reemplazados y ajustes ejecutados...'
                         : draftTipo === 'Otros'
                         ? 'Describa detalladamente las tareas ejecutadas...'
@@ -783,7 +762,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                   <div className="divide-y divide-[#e0e0e0]">
                     {tareasRegistradas.map((item, idx) => {
                       const eq = equipos.find((e) => e.id === item.equipoId);
-                      const tec = nomina.find((t) => t.id === item.tecnicoResponsableId);
 
                       return (
                         <div key={idx} className="p-3 bg-white hover:bg-[#f4f4f4] text-xs">
@@ -792,26 +770,17 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                               <span className="font-mono font-bold bg-[#161616] text-white px-1.5 py-0.5">
                                 {eq?.identificador}
                               </span>
-                              <span className="font-semibold text-[#0f62fe]">
-                                {item.tipoIntervencion}
+                              <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-xs font-bold">
+                                {item.tipoIntervencion === 'Preventivo' && item.tipoPreventivo
+                                  ? item.tipoPreventivo
+                                  : item.tipoIntervencion}
                               </span>
-                              {item.tipoPreventivo && (
-                                <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-xs font-bold">
-                                  {item.tipoPreventivo}
+                              {item.subtipoVerificacionAerea === 'Con alarmas' && (
+                                <span className="px-2 py-0.5 text-xs font-bold border bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]">
+                                  Con alarmas
                                 </span>
                               )}
-                              {item.subtipoVerificacionAerea && (
-                                <span
-                                  className={`px-2 py-0.5 text-xs font-bold border ${
-                                    item.subtipoVerificacionAerea === 'Con alarmas'
-                                      ? 'bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]'
-                                      : 'bg-[#defbe6] text-[#0e6027] border-[#a7f0ba]'
-                                  }`}
-                                >
-                                  {item.subtipoVerificacionAerea}
-                                </span>
-                              )}
-                              <span className="text-[#6f6f6f]">• Fecha: {formatearFecha(item.fechaEjecucion)}</span>
+                              <span className="text-[#6f6f6f]">• {formatearFecha(item.fechaEjecucion)}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <span
@@ -845,12 +814,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                                 <strong>Pendiente prox. visita:</strong>{' '}
                                 {item.tareaPendienteProximaVisita}
                               </span>
-                            </div>
-                          )}
-
-                          {tec && (
-                            <div className="text-[10px] text-[#6f6f6f] mt-1">
-                              Responsable: <span className="uppercase">{tec.apellido}</span>, {tec.nombre} ({tec.puesto})
                             </div>
                           )}
                         </div>
@@ -887,7 +850,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                     onChange={(e) => setDraftNovAeropuerto(e.target.value)}
                     className="w-full bg-white border border-[#8d8d8d] px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe]"
                   >
-                    {comision.destinosAeropuertos.map((cod) => {
+                    {destinosVisitados.map((cod) => {
                       const a = aeropuertos.find((ar) => ar.codigoIATA === cod);
                       return (
                         <option key={cod} value={cod}>
@@ -1041,23 +1004,14 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                             <span className="font-mono font-bold bg-[#161616] text-white px-1.5 py-0.5">
                               {eq?.identificador}
                             </span>
-                            <span className="font-semibold text-[#0f62fe]">
-                              {t.tipoIntervencion}
+                            <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-[11px] font-bold">
+                              {t.tipoIntervencion === 'Preventivo' && t.tipoPreventivo
+                                ? t.tipoPreventivo
+                                : t.tipoIntervencion}
                             </span>
-                            {t.tipoPreventivo && (
-                              <span className="bg-[#edf5ff] text-[#002d9c] border border-[#b9d3ff] px-2 py-0.5 text-[11px] font-bold">
-                                {t.tipoPreventivo}
-                              </span>
-                            )}
-                            {t.subtipoVerificacionAerea && (
-                              <span
-                                className={`px-2 py-0.5 text-[11px] font-bold border ${
-                                  t.subtipoVerificacionAerea === 'Con alarmas'
-                                    ? 'bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]'
-                                    : 'bg-[#defbe6] text-[#0e6027] border-[#a7f0ba]'
-                                }`}
-                              >
-                                {t.subtipoVerificacionAerea}
+                            {t.subtipoVerificacionAerea === 'Con alarmas' && (
+                              <span className="px-2 py-0.5 text-[11px] font-bold border bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]">
+                                Con alarmas
                               </span>
                             )}
                             <span className="text-[#6f6f6f]">• {formatearFecha(t.fechaEjecucion)}</span>
@@ -1128,10 +1082,11 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmarCierre}
-                className="flex items-center space-x-1.5 px-5 py-2 bg-[#198038] hover:bg-[#0e6027] text-white text-xs font-bold tracking-wide shadow-sm transition-colors"
+                disabled={enviando}
+                className="flex items-center space-x-1.5 px-5 py-2 bg-[#198038] hover:bg-[#0e6027] disabled:bg-[#8d8d8d] disabled:cursor-not-allowed text-white text-xs font-bold tracking-wide shadow-sm transition-colors"
               >
                 <Check className="w-4 h-4" />
-                <span>CONFIRMAR Y FINALIZAR COMISIÓN</span>
+                <span>{enviando ? 'FINALIZANDO...' : 'CONFIRMAR Y FINALIZAR COMISIÓN'}</span>
               </button>
             )}
           </div>

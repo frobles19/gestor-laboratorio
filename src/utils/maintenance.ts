@@ -1,5 +1,28 @@
 import { PuestoTecnico, Tecnico, NivelSemaforo, EstadoVencimiento } from '../types';
 
+/**
+ * Fecha de "hoy" en formato YYYY-MM-DD usando la hora LOCAL del navegador.
+ * Se usa en todo el sistema para evitar desfasajes de un día que ocurrían
+ * al mezclar new Date().toISOString() (UTC) con comparaciones en hora local.
+ */
+export function getHoyLocalStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dia}`;
+}
+
+/**
+ * Genera un identificador único con prefijo, combinando timestamp y un
+ * componente aleatorio para evitar colisiones ante creaciones casi simultáneas
+ * (ej. doble clic en el mismo milisegundo).
+ */
+export function generarId(prefijo: string): string {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${prefijo}-${Date.now()}-${random}`;
+}
+
 export const JERARQUIA_VALOR: Record<PuestoTecnico, number> = {
   'Jefe Departamento': 1,
   'Jefe Laboratorio': 2,
@@ -184,14 +207,14 @@ export function calcularDiscrepanciaDias(
 /**
  * Toda comisión en estado de 'Planificada' pasa a estar 'En Curso'
  * cuando la fecha actual está dentro del rango de fechas de la comisión (hoy >= fechaSalida && hoy <= fechaRegreso, o si hoy >= fechaSalida).
- * Una vez finalizada NO vuelve a cambiar.
+ * Finalizada y Cancelada son estados terminales: NUNCA vuelven a cambiar.
  */
 export function evaluarEstadoComisionSegunFecha(
   comision: { estado: string; fechaSalida: string; fechaRegreso: string },
   fechaHoy?: string
-): 'Planificada' | 'En Curso' | 'Finalizada' {
-  if (comision.estado === 'Finalizada') {
-    return 'Finalizada';
+): 'Planificada' | 'En Curso' | 'Finalizada' | 'Cancelada' {
+  if (comision.estado === 'Finalizada' || comision.estado === 'Cancelada') {
+    return comision.estado;
   }
 
   const hoy = fechaHoy || new Date().toISOString().split('T')[0];
@@ -203,7 +226,7 @@ export function evaluarEstadoComisionSegunFecha(
     }
   }
 
-  return comision.estado as 'Planificada' | 'En Curso' | 'Finalizada';
+  return comision.estado as 'Planificada' | 'En Curso' | 'Finalizada' | 'Cancelada';
 }
 
 /**

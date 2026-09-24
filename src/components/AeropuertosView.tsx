@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { Layers, MapPin, Radio, Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { RegionAeronautica, Aeropuerto } from '../types';
 
 export const AeropuertosView: React.FC = () => {
-  const { aeropuertos, equipos, modelos, guardarAeropuerto } = useApp();
+  const { aeropuertos, equipos, guardarAeropuerto } = useApp();
 
   const [busqueda, setBusqueda] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [codigoIATA, setCodigoIATA] = useState('');
   const [nombreOficial, setNombreOficial] = useState('');
   const [region, setRegion] = useState<RegionAeronautica>('EZEIZA');
-  const [ciudad, setCiudad] = useState('');
-  const [provincia, setProvincia] = useState('');
 
   const REGIONES: RegionAeronautica[] = [
     'EZEIZA',
@@ -30,15 +28,11 @@ export const AeropuertosView: React.FC = () => {
       codigoIATA: codigoIATA.trim().toUpperCase(),
       nombreOficial: nombreOficial.trim(),
       region,
-      ciudad: ciudad.trim(),
-      provincia: provincia.trim(),
     });
 
     setModalOpen(false);
     setCodigoIATA('');
     setNombreOficial('');
-    setCiudad('');
-    setProvincia('');
   };
 
   const aeropuertosFiltrados = aeropuertos.filter((a) => {
@@ -46,8 +40,7 @@ export const AeropuertosView: React.FC = () => {
     return (
       a.codigoIATA.toLowerCase().includes(q) ||
       a.nombreOficial.toLowerCase().includes(q) ||
-      a.region.toLowerCase().includes(q) ||
-      (a.ciudad || '').toLowerCase().includes(q)
+      a.region.toLowerCase().includes(q)
     );
   });
 
@@ -56,27 +49,27 @@ export const AeropuertosView: React.FC = () => {
       {/* Encabezado */}
       <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-mono font-bold bg-[#393939] text-white px-2 py-0.5">
-              MÓDULO 404
-            </span>
-            <h1 className="text-lg font-bold text-[#161616] tracking-tight">
-              RED AERONÁUTICA NACIONAL Y REGIONES TÉCNICAS
-            </h1>
-          </div>
-          <p className="text-xs text-[#525252] mt-0.5">
-            Distribución de aeropuertos clasificados por las 5 Regiones de Infraestructura: Ezeiza,
-            Córdoba, Resistencia, Mendoza y Comodoro Rivadavia.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#161616] tracking-tight">
+            AERÓDROMOS
+          </h1>
         </div>
 
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-[#0f62fe] hover:bg-[#0353e9] text-white text-xs font-bold tracking-wide transition-colors shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          <span>AGREGAR AEROPUERTO</span>
-        </button>
+        <div className="flex items-center flex-wrap gap-2.5">
+          <div className="flex items-center space-x-2.5 px-3.5 py-2 border bg-[#161616] text-white border-[#161616] shadow-xs">
+            <span className="text-xs uppercase font-bold tracking-wider">Total Aeródromos</span>
+            <span className="text-sm font-mono font-bold px-2 py-0.5 bg-white text-[#161616]">
+              {aeropuertos.length}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center space-x-1.5 px-4 py-2.5 bg-[#0f62fe] hover:bg-[#0353e9] text-white text-sm font-bold tracking-wide transition-colors shadow-xs cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>AGREGAR AEROPUERTO</span>
+          </button>
+        </div>
       </div>
 
       {/* Buscador */}
@@ -96,93 +89,71 @@ export const AeropuertosView: React.FC = () => {
         </span>
       </div>
 
-      {/* Tarjetas Agrupadas por Región */}
-      <div className="space-y-4">
-        {REGIONES.map((reg) => {
-          const aerosEnRegion = aeropuertosFiltrados.filter((a) => a.region === reg);
-          if (aerosEnRegion.length === 0 && busqueda) return null;
+      {/* Tarjetas de Aeropuertos (todos juntos, sin agrupar por región) */}
+      <div className="bg-white border border-[#e0e0e0] p-4">
+        {aeropuertosFiltrados.length === 0 ? (
+          <div className="py-8 text-center text-[#8d8d8d] text-sm">
+            No se encontraron aeropuertos para la búsqueda.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {aeropuertosFiltrados.map((aero) => {
+              const equiposInstalados = equipos.filter(
+                (e) => e.aeropuertoCodigo === aero.codigoIATA
+              );
 
-          return (
-            <div key={reg} className="bg-white border border-[#e0e0e0] overflow-hidden">
-              <div className="bg-[#262626] text-white px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2 h-2 bg-[#0f62fe] inline-block"></span>
-                  <span>{reg}</span>
-                </div>
-                <span className="text-[11px] font-mono font-normal text-[#c6c6c6]">
-                  {aerosEnRegion.length} Aeropuerto(s)
-                </span>
-              </div>
-
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {aerosEnRegion.map((aero) => {
-                  const equiposInstalados = equipos.filter(
-                    (e) => e.aeropuertoCodigo === aero.codigoIATA
-                  );
-
-                  return (
-                    <div
-                      key={aero.codigoIATA}
-                      className="border border-[#e0e0e0] p-3 bg-[#fbfbfb] hover:bg-white transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <span className="font-mono font-bold text-sm bg-[#161616] text-white px-2 py-0.5">
-                          {aero.codigoIATA}
-                        </span>
-                        <span className="text-[10px] text-[#6f6f6f] font-medium uppercase font-mono">
-                          {aero.region}
-                        </span>
-                      </div>
-
-                      <h3 className="text-xs font-bold text-[#161616] mt-2 line-clamp-2">
+              return (
+                <div
+                  key={aero.codigoIATA}
+                  className="border border-[#e0e0e0] p-3 bg-[#fbfbfb] hover:bg-white transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono font-bold text-sm bg-[#161616] text-white px-2 py-0.5 shrink-0">
+                        {aero.codigoIATA}
+                      </span>
+                      <h3 className="text-xs font-bold text-[#161616] leading-tight">
                         {aero.nombreOficial}
                       </h3>
-
-                      {/* Radioayudas instaladas en este aeropuerto */}
-                      <div className="mt-3 pt-2 border-t border-[#e0e0e0]">
-                        <div className="text-[10px] font-bold text-[#6f6f6f] uppercase mb-1 flex items-center space-x-1">
-                          <Radio className="w-3 h-3 text-[#0f62fe]" />
-                          <span>Radioayudas Instaladas ({equiposInstalados.length}):</span>
-                        </div>
-
-                        {equiposInstalados.length === 0 ? (
-                          <span className="text-[11px] text-[#8d8d8d] italic">
-                            Sin equipos registrados
-                          </span>
-                        ) : (
-                          <div className="space-y-1">
-                            {equiposInstalados.map((eq) => {
-                              const mod = modelos.find((m) => m.id === eq.modeloId);
-                              return (
-                                <div
-                                  key={eq.id}
-                                  className="text-[11px] flex items-center justify-between font-mono bg-white p-1 border border-[#e0e0e0]"
-                                >
-                                  <span className="font-bold text-[#161616]">
-                                    {eq.identificador}
-                                  </span>
-                                  <span
-                                    className={`text-[9px] px-1 font-bold ${
-                                      eq.estadoOperativo === 'EN_SERVICIO'
-                                        ? 'text-[#0e6027] bg-[#defbe6]'
-                                        : 'text-[#da1e28] bg-[#ffebee]'
-                                    }`}
-                                  >
-                                    {eq.estadoOperativo === 'EN_SERVICIO' ? 'OPR' : 'FS'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+                    <span className="text-[10px] text-[#6f6f6f] font-medium uppercase font-mono shrink-0">
+                      {aero.region}
+                    </span>
+                  </div>
+
+                  {/* Radioayudas instaladas en este aeropuerto */}
+                  <div className="mt-3 pt-2 border-t border-[#e0e0e0]">
+                    {equiposInstalados.length === 0 ? (
+                      <span className="text-[11px] text-[#8d8d8d] italic">
+                        Sin equipos registrados
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        {equiposInstalados.map((eq) => (
+                          <div
+                            key={eq.id}
+                            className="text-[11px] flex items-center justify-between font-mono bg-white p-1 border border-[#e0e0e0]"
+                          >
+                            <span className="font-bold text-[#161616]">{eq.identificador}</span>
+                            <span
+                              className={`text-[9px] px-1 font-bold ${
+                                eq.estadoOperativo === 'EN_SERVICIO'
+                                  ? 'text-[#0e6027] bg-[#defbe6]'
+                                  : 'text-[#da1e28] bg-[#ffebee]'
+                              }`}
+                            >
+                              {eq.estadoOperativo === 'EN_SERVICIO' ? 'E/S' : 'F/S'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal Nuevo Aeropuerto */}
@@ -244,27 +215,6 @@ export const AeropuertosView: React.FC = () => {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold uppercase mb-1">Ciudad</label>
-                  <input
-                    type="text"
-                    value={ciudad}
-                    onChange={(e) => setCiudad(e.target.value)}
-                    className="w-full bg-white border border-[#8d8d8d] px-3 py-1.5 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase mb-1">Provincia</label>
-                  <input
-                    type="text"
-                    value={provincia}
-                    onChange={(e) => setProvincia(e.target.value)}
-                    className="w-full bg-white border border-[#8d8d8d] px-3 py-1.5 text-xs"
-                  />
-                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-3 border-t border-[#e0e0e0]">

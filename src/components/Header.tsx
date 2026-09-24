@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, Plane, ShieldCheck, RefreshCw, Layers } from 'lucide-react';
+import { Radio, Plane, ShieldCheck, Layers } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 interface HeaderProps {
@@ -8,10 +8,8 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) => {
-  const { comisiones, equipos, restaurarDatosIniciales } = useApp();
+  const { equipos } = useApp();
 
-  const comisionesEnCurso = comisiones.filter((c) => c.estado === 'En Curso').length;
-  const comisionesPlanificadas = comisiones.filter((c) => c.estado === 'Planificada').length;
   const equiposFueraServicio = equipos.filter((e) => e.estadoOperativo === 'FUERA_DE_SERVICIO').length;
 
   return (
@@ -24,47 +22,19 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
             <div className="bg-[#0f62fe] text-white p-2 rounded flex items-center justify-center shadow-inner">
               <Radio className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-mono font-bold tracking-widest bg-[#393939] text-[#82cfff] px-1.5 py-0.5 rounded">
-                  IBM MAXIMO
-                </span>
-                <span className="text-sm font-semibold tracking-wide text-white uppercase">
-                  Gestión Técnica de Radioayudas Aeronáuticas
-                </span>
-              </div>
-              <p className="text-[11px] text-[#c6c6c6] hidden sm:block">
-                Dirección Nacional de Infraestructura y Comunicaciones Aeronáuticas
-              </p>
-            </div>
+            <span className="text-sm font-semibold tracking-wide text-white uppercase">
+              Laboratorio
+            </span>
           </div>
 
-          {/* Acciones y Perfil de Usuario */}
-          <div className="flex items-center space-x-4">
-            <div className="hidden md:flex items-center space-x-2 text-xs text-[#a8a8a8] border-r border-[#393939] pr-4">
-              <span className="inline-block w-2 h-2 rounded-full bg-[#198038]"></span>
-              <span>Base Central EZEIZA</span>
-              <span className="text-[#6f6f6f]">•</span>
-              <span className="font-mono text-[#c6c6c6]">v2.6.4</span>
+          {/* Usuario que inició sesión */}
+          <div className="flex items-center space-x-2 pl-2">
+            <div className="w-8 h-8 rounded-full bg-[#0043ce] text-white font-bold flex items-center justify-center text-xs border border-[#4589ff]">
+              FT
             </div>
-
-            <button
-              onClick={restaurarDatosIniciales}
-              title="Restablecer datos de prueba a valores iniciales"
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-[#262626] hover:bg-[#393939] text-[#f4f4f4] text-xs rounded border border-[#525252] transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-[#82cfff]" />
-              <span className="hidden sm:inline">Restablecer Datos</span>
-            </button>
-
-            <div className="flex items-center space-x-2 pl-2">
-              <div className="w-8 h-8 rounded-full bg-[#0043ce] text-white font-bold flex items-center justify-center text-xs border border-[#4589ff]">
-                FT
-              </div>
-              <div className="hidden lg:block text-left text-xs">
-                <div className="font-medium text-white leading-tight">Ing. Fran</div>
-                <div className="text-[10px] text-[#8d8d8d]">Admin Técnico Central</div>
-              </div>
+            <div className="hidden lg:block text-left text-xs">
+              <div className="font-medium text-white leading-tight">Ing. Fran</div>
+              <div className="text-[10px] text-[#8d8d8d]">Admin Técnico Central</div>
             </div>
           </div>
         </div>
@@ -83,12 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
               }`}
             >
               <Plane className="w-4.5 h-4.5 text-[#82cfff]" />
-              <span>Comisiones de Servicio</span>
-              {comisionesEnCurso > 0 && (
-                <span className="ml-1 bg-[#0f62fe] text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                  {comisionesEnCurso} en curso
-                </span>
-              )}
+              <span>Comisiones</span>
             </button>
 
             <button
