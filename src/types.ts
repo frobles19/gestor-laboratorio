@@ -127,3 +127,21 @@ export interface EstadoVencimiento {
   nivel: NivelSemaforo;
   etiqueta: string;
 }
+
+// Auditoría / trazabilidad genérica, reutilizable por cualquier módulo del sistema.
+// Por ahora solo se registran eventos del módulo de Comisiones.
+export type ModuloAuditoria = 'COMISIONES';
+
+export type AccionAuditoria = 'CREAR' | 'EDITAR' | 'CANCELAR' | 'ELIMINAR' | 'CERRAR';
+
+export interface RegistroAuditoria {
+  id: string;
+  modulo: ModuloAuditoria;
+  entidadId: string;
+  entidadEtiqueta: string; // ej: código de la comisión, para mostrar sin tener que buscarla
+  accion: AccionAuditoria;
+  fecha: string; // ISO 8601 con hora
+  usuario: string;
+  estadoAnterior: Record<string, unknown> | null;
+  estadoNuevo: Record<string, unknown> | null;
+}

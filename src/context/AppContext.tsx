@@ -9,6 +9,8 @@ import {
   NovedadComision,
   EstadoComision,
   TipoIntervencion,
+  RegistroAuditoria,
+  AccionAuditoria,
 } from '../types';
 import {
   INITIAL_AEROPUERTOS,
@@ -34,6 +36,7 @@ interface AppContextType {
   comisiones: ComisionServicio[];
   intervenciones: IntervencionMantenimiento[];
   novedades: NovedadComision[];
+  auditoria: RegistroAuditoria[];
 
   // Acciones de Comisiones
   crearComision: (
@@ -86,7 +89,12 @@ const STORAGE_KEYS = {
   COMISIONES: 'maximo_radioayudas_comisiones_v1',
   INTERVENCIONES: 'maximo_radioayudas_intervenciones_v1',
   NOVEDADES: 'maximo_radioayudas_novedades_v1',
+  AUDITORIA: 'maximo_radioayudas_auditoria_v1',
 };
+
+// Usuario fijo de la sesión actual: el sistema todavía no tiene autenticación
+// multiusuario, por lo que toda acción auditada se atribuye a este usuario.
+const USUARIO_ACTUAL = 'Ing. Fran';
 
 const TIPOS_INTERVENCION_VALIDOS: TipoIntervencion[] = [
   'Verificación',
@@ -158,6 +166,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_NOVEDADES;
   });
 
+  const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AUDITORIA);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // Guardar en localStorage ante cambios
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.AEROPUERTOS, JSON.stringify(aeropuertos));
@@ -186,6 +199,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.NOVEDADES, JSON.stringify(novedades));
   }, [novedades]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AUDITORIA, JSON.stringify(auditoria));
+  }, [auditoria]);
+
+  // Registra un evento de auditoría genérico (por ahora solo se invoca desde
+  // el módulo de Comisiones, pero el mecanismo es reutilizable por cualquier
+  // otro módulo que necesite trazabilidad de sus acciones).
+  const registrarAuditoria = (
+    accion: AccionAuditoria,
+    entidadId: string,
+    entidadEtiqueta: string,
+    estadoAnterior: Record<string, unknown> | null,
+    estadoNuevo: Record<string, unknown> | null
+  ) => {
+    const registro: RegistroAuditoria = {
+      id: generarId('AUD'),
+      modulo: 'COMISIONES',
+      entidadId,
+      entidadEtiqueta,
+      accion,
+      fecha: new Date().toISOString(),
+      usuario: USUARIO_ACTUAL,
+      estadoAnterior,
+      estadoNuevo,
+    };
+    setAuditoria((prev) => [registro, ...prev]);
+  };
 
   // Regla de Negocio:
   // Toda comisión en estado de 'Planificada' pasa a estar 'En Curso' cuando la fecha está dentro del rango de fechas de la comisión.
@@ -300,10 +341,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setComisiones((prev) => [nuevaComision, ...prev]);
+    registrarAuditoria('CREAR', id, codigo, null, nuevaComision as unknown as Record<string, unknown>);
     return nuevaComision;
   };
 
   const actualizarComision = (comisionActualizada: ComisionServicio) => {
+    const comisionAnterior = comisiones.find((c) => c.id === comisionActualizada.id) || null;
+
     // Si cambiaron técnicos, recalcular automáticamente el Jefe de Comisión
     const jefe = determinarJefeComision(comisionActualizada.tecnicosIds, nomina);
     const jefeFinalId = jefe ? jefe.id : comisionActualizada.jefeComisionId;
@@ -315,6 +359,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setComisiones((prev) =>
       prev.map((c) => (c.id === objetoFinal.id ? objetoFinal : c))
+    );
+    registrarAuditoria(
+      'EDITAR',
+      objetoFinal.id,
+      objetoFinal.codigo,
+      comisionAnterior as unknown as Record<string, unknown> | null,
+      objetoFinal as unknown as Record<string, unknown>
     );
   };
 
@@ -329,17 +380,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (comision.estado === 'Cancelada') {
       throw new Error('Esta comisión ya fue cancelada.');
     }
+    const comisionCancelada: ComisionServicio = {
+      ...comision,
+      estado: 'Cancelada' as EstadoComision,
+      canceladaAt: getHoyLocalStr(),
+      motivoCancelacion: motivo?.trim() || undefined,
+    };
+
     setComisiones((prev) =>
-      prev.map((c) =>
-        c.id === comisionId
-          ? {
-              ...c,
-              estado: 'Cancelada' as EstadoComision,
-              canceladaAt: getHoyLocalStr(),
-              motivoCancelacion: motivo?.trim() || undefined,
-            }
-          : c
-      )
+      prev.map((c) => (c.id === comisionId ? comisionCancelada : c))
+    );
+    registrarAuditoria(
+      'CANCELAR',
+      comision.id,
+      comision.codigo,
+      comision as unknown as Record<string, unknown>,
+      comisionCancelada as unknown as Record<string, unknown>
     );
   };
 
@@ -358,6 +414,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // asociadas (esas solo se generan en cerrarComisionConFlujo), pero se filtran igual por las dudas.
     setIntervenciones((prev) => prev.filter((i) => i.comisionId !== comisionId));
     setNovedades((prev) => prev.filter((n) => n.comisionId !== comisionId));
+    registrarAuditoria(
+      'ELIMINAR',
+      comision.id,
+      comision.codigo,
+      comision as unknown as Record<string, unknown>,
+      null
+    );
   };
 
   const cerrarComisionConFlujo = (datosCierre: {
@@ -494,28 +557,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // 5. Marcar comisión como Finalizada, guardar fechas reales, destinos visitados y reemplazar el/los tipo(s) de mantenimiento previstos por todos los realmente realizados
-    setComisiones((prev) =>
-      prev.map((com) => {
-        if (com.id === datosCierre.comisionId) {
-          // Extraer todos los tipos de mantenimiento únicos realizados en las tareas de la comisión.
-          // Una comisión puede terminar abarcando más de un tipo (ej. Verificación + Preventivo).
-          const tiposRealizados = Array.from(
-            new Set(datosCierre.intervencionesNuevas.map((t) => t.tipoIntervencion))
-          );
+    // Extraer todos los tipos de mantenimiento únicos realizados en las tareas de la comisión.
+    // Una comisión puede terminar abarcando más de un tipo (ej. Verificación + Preventivo).
+    const tiposRealizados = Array.from(
+      new Set(datosCierre.intervencionesNuevas.map((t) => t.tipoIntervencion))
+    );
 
-          return {
-            ...com,
-            estado: 'Finalizada' as EstadoComision,
-            tiposMantenimiento: tiposRealizados.length > 0 ? tiposRealizados : com.tiposMantenimiento,
-            fechaSalidaReal: datosCierre.fechaSalidaReal,
-            fechaRegresoReal: datosCierre.fechaRegresoReal,
-            destinosAeropuertos: destinosVisitados,
-            observacionesCierre: datosCierre.observacionesCierre,
-            finalizadaAt: hoyStr,
-          };
-        }
-        return com;
-      })
+    const comisionFinalizada: ComisionServicio = {
+      ...comisionActual,
+      estado: 'Finalizada' as EstadoComision,
+      tiposMantenimiento: tiposRealizados.length > 0 ? tiposRealizados : comisionActual.tiposMantenimiento,
+      fechaSalidaReal: datosCierre.fechaSalidaReal,
+      fechaRegresoReal: datosCierre.fechaRegresoReal,
+      destinosAeropuertos: destinosVisitados,
+      observacionesCierre: datosCierre.observacionesCierre,
+      finalizadaAt: hoyStr,
+    };
+
+    setComisiones((prev) =>
+      prev.map((com) => (com.id === datosCierre.comisionId ? comisionFinalizada : com))
+    );
+    registrarAuditoria(
+      'CERRAR',
+      comisionActual.id,
+      comisionActual.codigo,
+      comisionActual as unknown as Record<string, unknown>,
+      comisionFinalizada as unknown as Record<string, unknown>
     );
   };
 
@@ -572,6 +639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem(STORAGE_KEYS.COMISIONES);
       localStorage.removeItem(STORAGE_KEYS.INTERVENCIONES);
       localStorage.removeItem(STORAGE_KEYS.NOVEDADES);
+      localStorage.removeItem(STORAGE_KEYS.AUDITORIA);
 
       setAeropuertos(INITIAL_AEROPUERTOS);
       setModelos(INITIAL_MODELOS);
@@ -580,6 +648,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setComisiones(INITIAL_COMISIONES);
       setIntervenciones(INITIAL_INTERVENCIONES);
       setNovedades(INITIAL_NOVEDADES);
+      setAuditoria([]);
     }
   };
 
@@ -593,6 +662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         comisiones,
         intervenciones,
         novedades,
+        auditoria,
         crearComision,
         actualizarComision,
         cancelarComision,
