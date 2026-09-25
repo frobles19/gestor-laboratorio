@@ -104,6 +104,18 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
             </button>
 
             <button
+              onClick={() => setVistaActiva('aeropuertos')}
+              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                vistaActiva === 'aeropuertos'
+                  ? 'border-[#0f62fe] bg-[#393939] text-white'
+                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+              }`}
+            >
+              <Layers className="w-4.5 h-4.5 text-[#ff7eb6]" />
+              <span>Aeropuertos</span>
+            </button>
+
+            <button
               onClick={() => setVistaActiva('radioayudas')}
               className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                 vistaActiva === 'radioayudas'
@@ -129,20 +141,9 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
               }`}
             >
               <ShieldCheck className="w-4.5 h-4.5 text-[#42be65]" />
-              <span>Nómina Técnica y Mando</span>
+              <span>Técnicos</span>
             </button>
 
-            <button
-              onClick={() => setVistaActiva('aeropuertos')}
-              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                vistaActiva === 'aeropuertos'
-                  ? 'border-[#0f62fe] bg-[#393939] text-white'
-                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
-              }`}
-            >
-              <Layers className="w-4.5 h-4.5 text-[#ff7eb6]" />
-              <span>Aeropuertos y Regiones</span>
-            </button>
           </nav>
 
           {menuComisionesAbierto && (

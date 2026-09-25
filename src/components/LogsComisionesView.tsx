@@ -8,40 +8,43 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Search,
+  X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AccionAuditoria } from '../types';
-import { formatearFecha } from '../utils/maintenance';
+import { formatearFecha, getClasesEstadoComision } from '../utils/maintenance';
 
 const ACCION_CONFIG: Record<
   AccionAuditoria,
   { label: string; icon: React.ElementType; classes: string }
 > = {
+  // Los colores replican los del resto de la app: Creación = botón "Nueva Comisión"
+  // (azul sólido), Cancelación/Cierre = etiquetas de estado Cancelada/Finalizada,
+  // Eliminación = botón de eliminar (rojo sólido), Edición = neutro.
   CREAR: {
     label: 'Creación',
     icon: Plus,
-    classes: 'bg-[#defbe6] text-[#0e6027] border border-[#a7f0ba]',
+    classes: 'bg-[#0f62fe] text-white border border-[#0f62fe]',
   },
   EDITAR: {
     label: 'Edición',
     icon: Pencil,
-    classes: 'bg-[#edf5ff] text-[#0043ce] border border-[#a6c8ff]',
+    classes: 'bg-[#f4f4f4] text-[#393939] border border-[#8d8d8d]',
   },
   CANCELAR: {
     label: 'Cancelación',
     icon: Ban,
-    classes: 'bg-[#fef3d6] text-[#8a6100] border border-[#fddc69]',
+    classes: getClasesEstadoComision('Cancelada').badge,
   },
   ELIMINAR: {
     label: 'Eliminación',
     icon: Trash2,
-    classes: 'bg-[#ffebee] text-[#da1e28] border border-[#ffb3b8]',
+    classes: 'bg-[#da1e28] text-white border border-[#da1e28]',
   },
   CERRAR: {
     label: 'Cierre',
     icon: CheckCircle2,
-    classes: 'bg-[#f6f2ff] text-[#6929c4] border border-[#d4bbff]',
+    classes: getClasesEstadoComision('Finalizada').badge,
   },
 };
 
@@ -135,46 +138,92 @@ function generarObservacion(
     }
 
     case 'ELIMINAR':
-      return 'Se eliminó la comisión definitivamente.';
+      return 'Se eliminó la comisión.';
 
     default:
       return '';
   }
 }
 
+// Fecha local (YYYY-MM-DD) de un timestamp ISO, para comparar contra los filtros de fecha.
+function fechaLocalDeISO(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dia}`;
+}
+
+const ACCIONES: AccionAuditoria[] = ['CREAR', 'EDITAR', 'CANCELAR', 'CERRAR', 'ELIMINAR'];
+
+const INPUT_FILTRO =
+  'w-full bg-[#161616] text-white border border-[#525252] px-2 py-1 text-xs font-mono font-normal normal-case tracking-normal placeholder-[#8d8d8d] focus:outline-hidden focus:border-[#0f62fe]';
+
 export const LogsComisionesView: React.FC = () => {
   const { auditoria } = useApp();
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroAccion, setFiltroAccion] = useState<AccionAuditoria | 'TODOS'>('TODOS');
   const [expandidoId, setExpandidoId] = useState<string | null>(null);
 
-  const registrosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    return auditoria.filter((r) => {
-      const coincideBusqueda =
-        q === '' ||
-        r.entidadEtiqueta.toLowerCase().includes(q) ||
-        r.usuario.toLowerCase().includes(q);
-      const coincideAccion = filtroAccion === 'TODOS' || r.accion === filtroAccion;
-      return coincideBusqueda && coincideAccion;
-    });
-  }, [auditoria, busqueda, filtroAccion]);
+  const [filtroComision, setFiltroComision] = useState('');
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
+  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [filtroAccion, setFiltroAccion] = useState<AccionAuditoria | 'TODOS'>('TODOS');
+  const [filtroObservacion, setFiltroObservacion] = useState('');
 
-  const ACCIONES: (AccionAuditoria | 'TODOS')[] = [
-    'TODOS',
-    'CREAR',
-    'EDITAR',
-    'CANCELAR',
-    'CERRAR',
-    'ELIMINAR',
-  ];
+  const hayFiltrosActivos =
+    filtroComision !== '' ||
+    filtroFechaDesde !== '' ||
+    filtroFechaHasta !== '' ||
+    filtroUsuario !== '' ||
+    filtroAccion !== 'TODOS' ||
+    filtroObservacion !== '';
+
+  const limpiarFiltros = () => {
+    setFiltroComision('');
+    setFiltroFechaDesde('');
+    setFiltroFechaHasta('');
+    setFiltroUsuario('');
+    setFiltroAccion('TODOS');
+    setFiltroObservacion('');
+  };
+
+  const registrosFiltrados = useMemo(() => {
+    const qComision = filtroComision.trim().toLowerCase();
+    const qUsuario = filtroUsuario.trim().toLowerCase();
+    const qObs = filtroObservacion.trim().toLowerCase();
+    return auditoria.filter((r) => {
+      if (qComision && !r.entidadEtiqueta.toLowerCase().includes(qComision)) return false;
+      if (qUsuario && !r.usuario.toLowerCase().includes(qUsuario)) return false;
+      if (filtroAccion !== 'TODOS' && r.accion !== filtroAccion) return false;
+
+      const fechaLocal = fechaLocalDeISO(r.fecha);
+      if (filtroFechaDesde && fechaLocal < filtroFechaDesde) return false;
+      if (filtroFechaHasta && fechaLocal > filtroFechaHasta) return false;
+
+      if (
+        qObs &&
+        !generarObservacion(r.accion, r.estadoAnterior, r.estadoNuevo).toLowerCase().includes(qObs)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    auditoria,
+    filtroComision,
+    filtroFechaDesde,
+    filtroFechaHasta,
+    filtroUsuario,
+    filtroAccion,
+    filtroObservacion,
+  ]);
 
   return (
     <div className="space-y-4">
       {/* Encabezado */}
       <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <History className="w-6 h-6 text-[#6929c4]" />
+          <History className="w-6 h-6 text-[#0f62fe]" />
           <h1 className="text-2xl sm:text-3xl font-bold text-[#161616] tracking-tight">
             HISTORIAL DE COMISIONES
           </h1>
@@ -188,53 +237,108 @@ export const LogsComisionesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-[#8d8d8d] absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por código de comisión o usuario..."
-            className="w-full pl-9 pr-3 py-2 border border-[#e0e0e0] text-sm focus:outline-none focus:border-[#0f62fe]"
-          />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {ACCIONES.map((accion) => (
-            <button
-              key={accion}
-              onClick={() => setFiltroAccion(accion)}
-              className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wide border transition-colors cursor-pointer ${
-                filtroAccion === accion
-                  ? 'bg-[#161616] text-white border-[#161616]'
-                  : 'bg-white text-[#525252] border-[#e0e0e0] hover:border-[#8d8d8d]'
-              }`}
-            >
-              {accion === 'TODOS' ? 'Todos' : ACCION_CONFIG[accion].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Listado */}
-      <div className="bg-white border border-[#e0e0e0] overflow-x-auto">
-        {registrosFiltrados.length === 0 ? (
-          <div className="p-8 text-center text-sm text-[#8d8d8d]">
-            No hay eventos registrados que coincidan con la búsqueda.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#161616] text-white text-xs uppercase tracking-wide">
-                <th className="text-left p-3 font-bold">Comisión</th>
-                <th className="text-left p-3 font-bold">Fecha</th>
-                <th className="text-left p-3 font-bold">Tipo de Acción</th>
-                <th className="text-left p-3 font-bold">Observaciones</th>
-                <th className="p-3 font-bold w-10"></th>
+      <div className="bg-white border border-[#e0e0e0] shadow-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#262626] text-[#f4f4f4] text-xs uppercase tracking-wider font-semibold">
+              <th className="py-3 px-3.5 border-r border-[#393939]">Comisión</th>
+              <th className="py-3 px-3.5 border-r border-[#393939]">Fecha</th>
+              <th className="py-3 px-3.5 border-r border-[#393939]">Usuario</th>
+              <th className="py-3 px-3.5 border-r border-[#393939]">Tipo de Acción</th>
+              <th className="py-3 px-3.5 border-r border-[#393939]">Observaciones</th>
+              <th className="py-3 px-3.5 w-14"></th>
+            </tr>
+            <tr className="bg-[#333333] border-b-2 border-[#0f62fe]">
+              <th className="p-2 align-middle border-r border-[#474747]">
+                <input
+                  type="text"
+                  value={filtroComision}
+                  onChange={(e) => setFiltroComision(e.target.value)}
+                  placeholder="Comisión (ej: COM-2026)..."
+                  className={INPUT_FILTRO}
+                />
+              </th>
+              <th className="p-2 align-middle border-r border-[#474747]">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] text-[#c6c6c6] w-11 shrink-0 font-semibold uppercase">
+                      Desde:
+                    </span>
+                    <input
+                      type="date"
+                      value={filtroFechaDesde}
+                      onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                      className={`${INPUT_FILTRO} px-1.5 py-0.5`}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] text-[#c6c6c6] w-11 shrink-0 font-semibold uppercase">
+                      Hasta:
+                    </span>
+                    <input
+                      type="date"
+                      value={filtroFechaHasta}
+                      onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                      className={`${INPUT_FILTRO} px-1.5 py-0.5`}
+                    />
+                  </div>
+                </div>
+              </th>
+              <th className="p-2 align-middle border-r border-[#474747]">
+                <input
+                  type="text"
+                  value={filtroUsuario}
+                  onChange={(e) => setFiltroUsuario(e.target.value)}
+                  placeholder="Usuario..."
+                  className={INPUT_FILTRO}
+                />
+              </th>
+              <th className="p-2 align-middle border-r border-[#474747]">
+                <select
+                  value={filtroAccion}
+                  onChange={(e) => setFiltroAccion(e.target.value as AccionAuditoria | 'TODOS')}
+                  className={INPUT_FILTRO}
+                >
+                  <option value="TODOS">Todas</option>
+                  {ACCIONES.map((accion) => (
+                    <option key={accion} value={accion}>
+                      {ACCION_CONFIG[accion].label}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="p-2 align-middle border-r border-[#474747]">
+                <input
+                  type="text"
+                  value={filtroObservacion}
+                  onChange={(e) => setFiltroObservacion(e.target.value)}
+                  placeholder="Observaciones..."
+                  className={INPUT_FILTRO}
+                />
+              </th>
+              <th className="p-2 align-middle text-center">
+                {hayFiltrosActivos && (
+                  <button
+                    onClick={limpiarFiltros}
+                    title="Limpiar filtros"
+                    className="p-1.5 bg-[#da1e28] hover:bg-[#a2191f] text-white transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {registrosFiltrados.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-sm text-[#8d8d8d]">
+                  No hay eventos registrados que coincidan con los filtros.
+                </td>
               </tr>
-            </thead>
-            <tbody>
+            )}
               {registrosFiltrados.map((registro) => {
                 const config = ACCION_CONFIG[registro.accion];
                 const Icon = config.icon;
@@ -249,27 +353,32 @@ export const LogsComisionesView: React.FC = () => {
 
                 return (
                   <React.Fragment key={registro.id}>
-                    <tr className="border-b border-[#e0e0e0] hover:bg-[#f4f4f4] transition-colors">
-                      <td className="p-3 font-mono font-semibold text-[#161616] align-top whitespace-nowrap">
+                    <tr className="border-b border-[#e0e0e0] hover:bg-[#f4f8ff] transition-colors">
+                      <td className="py-3 px-3.5 border-r border-[#e0e0e0] text-xs text-[#0f62fe] font-bold font-mono align-top whitespace-nowrap">
                         {registro.entidadEtiqueta}
                       </td>
-                      <td className="p-3 text-xs text-[#525252] align-top whitespace-nowrap font-mono">
+                      <td className="py-3 px-3.5 border-r border-[#e0e0e0] text-sm text-[#161616] font-mono font-medium align-top whitespace-nowrap">
                         {formatearFecha(registro.fecha)}{' '}
                         {new Date(registro.fecha).toLocaleTimeString('es-AR', {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
                       </td>
-                      <td className="p-3 align-top whitespace-nowrap">
+                      <td className="py-3 px-3.5 border-r border-[#e0e0e0] text-sm text-[#161616] font-mono align-top whitespace-nowrap">
+                        {registro.usuario}
+                      </td>
+                      <td className="py-3 px-3.5 border-r border-[#e0e0e0] align-top whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${config.classes}`}
+                          className={`inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${config.classes}`}
                         >
                           <Icon className="w-3.5 h-3.5" />
                           <span>{config.label}</span>
                         </span>
                       </td>
-                      <td className="p-3 text-[#161616] align-top">{observacion}</td>
-                      <td className="p-3 align-top text-right">
+                      <td className="py-3 px-3.5 border-r border-[#e0e0e0] text-sm text-[#161616] align-top">
+                        {observacion}
+                      </td>
+                      <td className="py-3 px-3.5 align-top text-center">
                         {tieneDetalle && (
                           <button
                             onClick={() => setExpandidoId(expandido ? null : registro.id)}
@@ -288,7 +397,7 @@ export const LogsComisionesView: React.FC = () => {
 
                     {expandido && tieneDetalle && (
                       <tr className="border-b border-[#e0e0e0] bg-[#f4f4f4]">
-                        <td colSpan={5} className="p-3">
+                        <td colSpan={6} className="p-3">
                           <table className="w-full text-xs border border-[#e0e0e0] bg-white">
                             <thead>
                               <tr className="bg-white text-[#525252] uppercase text-[10px] tracking-wide">
@@ -317,7 +426,15 @@ export const LogsComisionesView: React.FC = () => {
               })}
             </tbody>
           </table>
-        )}
+        </div>
+
+        {/* Barra de estado inferior */}
+        <div className="bg-[#f4f4f4] px-4 py-2 border-t border-[#e0e0e0] flex items-center justify-between text-xs text-[#525252]">
+          <span>
+            Mostrando <strong>{registrosFiltrados.length}</strong> de{' '}
+            <strong>{auditoria.length}</strong> eventos registrados
+          </span>
+        </div>
       </div>
     </div>
   );

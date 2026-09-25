@@ -61,6 +61,7 @@ export const NuevaComisionModal: React.FC<NuevaComisionModalProps> = ({
   // Lista de técnicos filtrada y no seleccionados aún
   const tecnicosDisponibles = useMemo(() => {
     return nomina.filter((t) => {
+      if (t.bajaAt) return false;
       const yaSeleccionado = tecnicosSeleccionados.includes(t.id);
       const nombreCompleto = `${t.nombre} ${t.apellido}`.toLowerCase();
       const coincide =
