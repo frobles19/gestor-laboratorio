@@ -1,16 +1,56 @@
-import React from 'react';
-import { Radio, Plane, ShieldCheck, Layers } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Radio, Plane, ShieldCheck, Layers, History, ChevronDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
+export type VistaActiva =
+  | 'comisiones-maestro'
+  | 'comisiones-logs'
+  | 'radioayudas'
+  | 'nomina'
+  | 'aeropuertos';
+
 interface HeaderProps {
-  vistaActiva: 'comisiones' | 'radioayudas' | 'nomina' | 'aeropuertos';
-  setVistaActiva: (vista: 'comisiones' | 'radioayudas' | 'nomina' | 'aeropuertos') => void;
+  vistaActiva: VistaActiva;
+  setVistaActiva: (vista: VistaActiva) => void;
 }
+
+const OPCIONES_COMISIONES: { vista: VistaActiva; label: string; icon: React.ElementType }[] = [
+  { vista: 'comisiones-maestro', label: 'Maestro de Comisiones', icon: Plane },
+  { vista: 'comisiones-logs', label: 'Historial de Comisiones', icon: History },
+];
 
 export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) => {
   const { equipos } = useApp();
+  const [menuComisionesAbierto, setMenuComisionesAbierto] = useState(false);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const equiposFueraServicio = equipos.filter((e) => e.estadoOperativo === 'FUERA_DE_SERVICIO').length;
+  const enModuloComisiones = vistaActiva === 'comisiones-maestro' || vistaActiva === 'comisiones-logs';
+
+  // Cierra el menú desplegable de Comisiones al hacer click fuera del botón y del panel
+  // (son hermanos en el DOM, no un único contenedor, para que el panel no quede
+  // clipeado por el overflow-x-auto del <nav>).
+  useEffect(() => {
+    const handleClickFuera = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        panelRef.current &&
+        !panelRef.current.contains(target)
+      ) {
+        setMenuComisionesAbierto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFuera);
+    return () => document.removeEventListener('mousedown', handleClickFuera);
+  }, []);
+
+  const seleccionarOpcionComisiones = (vista: VistaActiva) => {
+    setVistaActiva(vista);
+    setMenuComisionesAbierto(false);
+  };
 
   return (
     <header className="bg-[#161616] text-[#f4f4f4] border-b border-[#393939] sticky top-0 z-40 shadow-sm">
@@ -42,18 +82,37 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
 
       {/* Barra de Módulos / Aplicaciones estilo IBM Maximo */}
       <div className="bg-[#262626] border-t border-[#393939]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Este contenedor (y no <nav>, que tiene overflow-x-auto y clipearía
+            un hijo absoluto que sobresalga verticalmente) es el ancla de posición
+            del menú desplegable de Comisiones. */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <nav className="flex space-x-1 overflow-x-auto py-1.5 scrollbar-none" aria-label="Tabs">
             <button
-              onClick={() => setVistaActiva('comisiones')}
+              ref={menuRef}
+              onClick={() => setMenuComisionesAbierto((prev) => !prev)}
               className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                vistaActiva === 'comisiones'
+                enModuloComisiones
                   ? 'border-[#0f62fe] bg-[#393939] text-white'
                   : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
               }`}
             >
               <Plane className="w-4.5 h-4.5 text-[#82cfff]" />
               <span>Comisiones</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform ${menuComisionesAbierto ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <button
+              onClick={() => setVistaActiva('aeropuertos')}
+              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                vistaActiva === 'aeropuertos'
+                  ? 'border-[#0f62fe] bg-[#393939] text-white'
+                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+              }`}
+            >
+              <Layers className="w-4.5 h-4.5 text-[#ff7eb6]" />
+              <span>Aeropuertos</span>
             </button>
 
             <button
@@ -82,21 +141,32 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
               }`}
             >
               <ShieldCheck className="w-4.5 h-4.5 text-[#42be65]" />
-              <span>Nómina Técnica y Mando</span>
+              <span>Técnicos</span>
             </button>
 
-            <button
-              onClick={() => setVistaActiva('aeropuertos')}
-              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
-                vistaActiva === 'aeropuertos'
-                  ? 'border-[#0f62fe] bg-[#393939] text-white'
-                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
-              }`}
-            >
-              <Layers className="w-4.5 h-4.5 text-[#ff7eb6]" />
-              <span>Aeropuertos y Regiones</span>
-            </button>
           </nav>
+
+          {menuComisionesAbierto && (
+            <div
+              ref={panelRef}
+              className="absolute left-4 sm:left-6 lg:left-8 top-full mt-1 w-72 bg-[#262626] border border-[#393939] shadow-lg z-50 py-1"
+            >
+              {OPCIONES_COMISIONES.map(({ vista, label, icon: Icon }) => (
+                <button
+                  key={vista}
+                  onClick={() => seleccionarOpcionComisiones(vista)}
+                  className={`w-full flex items-center space-x-2.5 px-4 py-2.5 text-sm text-left whitespace-nowrap transition-colors cursor-pointer ${
+                    vistaActiva === vista
+                      ? 'bg-[#393939] text-white'
+                      : 'text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 text-[#82cfff] shrink-0" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </header>

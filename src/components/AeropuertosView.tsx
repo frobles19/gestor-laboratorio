@@ -1,13 +1,31 @@
 import React, { useState } from 'react';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Filter } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { RegionAeronautica, Aeropuerto } from '../types';
+import { AeropuertoFichaModal } from './AeropuertoFichaModal';
 
-export const AeropuertosView: React.FC = () => {
-  const { aeropuertos, equipos, guardarAeropuerto } = useApp();
+// Cada región se identifica por el código IATA de su aeropuerto principal.
+const CODIGO_REGION: Record<RegionAeronautica, string> = {
+  EZEIZA: 'EZE',
+  CORDOBA: 'COR',
+  RESISTENCIA: 'RES',
+  MENDOZA: 'MDZ',
+  'COMODORO RIVADAVIA': 'CRD',
+};
+
+interface AeropuertosViewProps {
+  onVerComisiones: (nombreAeropuerto: string) => void;
+}
+
+export const AeropuertosView: React.FC<AeropuertosViewProps> = ({ onVerComisiones }) => {
+  const { aeropuertos, equipos, crearAeropuerto, actualizarAeropuerto } = useApp();
 
   const [busqueda, setBusqueda] = useState('');
+  const [filtrosRegion, setFiltrosRegion] = useState<RegionAeronautica[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [aeropuertoEditando, setAeropuertoEditando] = useState<Aeropuerto | null>(null);
+  const [aeropuertoFicha, setAeropuertoFicha] = useState<Aeropuerto | null>(null);
+  const [errorForm, setErrorForm] = useState<string | null>(null);
   const [codigoIATA, setCodigoIATA] = useState('');
   const [nombreOficial, setNombreOficial] = useState('');
   const [region, setRegion] = useState<RegionAeronautica>('EZEIZA');
@@ -20,28 +38,58 @@ export const AeropuertosView: React.FC = () => {
     'COMODORO RIVADAVIA',
   ];
 
-  const handleCrear = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!codigoIATA || !nombreOficial) return;
-
-    guardarAeropuerto({
-      codigoIATA: codigoIATA.trim().toUpperCase(),
-      nombreOficial: nombreOficial.trim(),
-      region,
-    });
-
-    setModalOpen(false);
+  const abrirAlta = () => {
+    setAeropuertoEditando(null);
     setCodigoIATA('');
     setNombreOficial('');
+    setRegion('EZEIZA');
+    setErrorForm(null);
+    setModalOpen(true);
+  };
+
+  const abrirEdicion = (aero: Aeropuerto) => {
+    setAeropuertoFicha(null);
+    setAeropuertoEditando(aero);
+    setCodigoIATA(aero.codigoIATA);
+    setNombreOficial(aero.nombreOficial);
+    setRegion(aero.region);
+    setErrorForm(null);
+    setModalOpen(true);
+  };
+
+  const cerrarFormulario = () => {
+    setModalOpen(false);
+    setAeropuertoEditando(null);
+    setErrorForm(null);
+  };
+
+  const handleGuardar = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (aeropuertoEditando) {
+        actualizarAeropuerto(aeropuertoEditando.codigoIATA, { nombreOficial, region });
+      } else {
+        crearAeropuerto({ codigoIATA, nombreOficial, region });
+      }
+      cerrarFormulario();
+    } catch (err) {
+      setErrorForm(err instanceof Error ? err.message : 'No se pudo guardar el aeropuerto.');
+    }
+  };
+
+  // Sin regiones seleccionadas se muestran todas; el texto solo busca por código IATA y nombre.
+  const toggleRegion = (reg: RegionAeronautica) => {
+    setFiltrosRegion((prev) =>
+      prev.includes(reg) ? prev.filter((r) => r !== reg) : [...prev, reg]
+    );
   };
 
   const aeropuertosFiltrados = aeropuertos.filter((a) => {
     const q = busqueda.toLowerCase();
-    return (
-      a.codigoIATA.toLowerCase().includes(q) ||
-      a.nombreOficial.toLowerCase().includes(q) ||
-      a.region.toLowerCase().includes(q)
-    );
+    const coincideTexto =
+      a.codigoIATA.toLowerCase().includes(q) || a.nombreOficial.toLowerCase().includes(q);
+    const coincideRegion = filtrosRegion.length === 0 || filtrosRegion.includes(a.region);
+    return coincideTexto && coincideRegion;
   });
 
   return (
@@ -50,7 +98,7 @@ export const AeropuertosView: React.FC = () => {
       <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#161616] tracking-tight">
-            AERÓDROMOS
+            MAESTRO DE AEROPUERTOS
           </h1>
         </div>
 
@@ -63,7 +111,7 @@ export const AeropuertosView: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={abrirAlta}
             className="flex items-center space-x-1.5 px-4 py-2.5 bg-[#0f62fe] hover:bg-[#0353e9] text-white text-sm font-bold tracking-wide transition-colors shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -72,25 +120,48 @@ export const AeropuertosView: React.FC = () => {
         </div>
       </div>
 
-      {/* Buscador */}
-      <div className="bg-white p-3 border border-[#e0e0e0] flex items-center justify-between">
-        <div className="relative w-full sm:w-80">
+      {/* Buscador y filtro por región */}
+      <div className="bg-white p-3 border border-[#e0e0e0] flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative w-full sm:w-80 shrink-0">
           <Search className="w-4 h-4 absolute left-3 top-2 text-[#8d8d8d]" />
           <input
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por código IATA, nombre oficial o región..."
+            placeholder="Buscar por código IATA o nombre..."
             className="w-full pl-9 pr-3 py-1 bg-[#f4f4f4] border border-[#8d8d8d] text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe] focus:bg-white"
           />
         </div>
-        <span className="text-xs text-[#6f6f6f] hidden sm:block">
-          {aeropuertosFiltrados.length} aeródromos registrados
-        </span>
+
+        <div className="flex items-center space-x-1.5 w-full sm:w-auto sm:ml-auto overflow-x-auto">
+          <span className="text-xs font-bold text-[#525252] mr-1 flex items-center space-x-1 shrink-0">
+            <Filter className="w-4 h-4 text-[#0f62fe]" />
+            <span>REGIÓN:</span>
+          </span>
+
+          {REGIONES.map((reg) => {
+            const estaSeleccionada = filtrosRegion.includes(reg);
+            return (
+              <button
+                key={reg}
+                onClick={() => toggleRegion(reg)}
+                title={reg}
+                className={`px-3 py-1 text-xs font-bold font-mono border transition-colors whitespace-nowrap cursor-pointer ${
+                  estaSeleccionada
+                    ? 'bg-[#161616] text-white border-[#161616]'
+                    : 'bg-[#f4f4f4] text-[#161616] border-[#e0e0e0] hover:bg-[#e0e0e0]'
+                }`}
+              >
+                {CODIGO_REGION[reg]}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tarjetas de Aeropuertos (todos juntos, sin agrupar por región) */}
-      <div className="bg-white border border-[#e0e0e0] p-4">
+      <div className="bg-white border border-[#e0e0e0] shadow-xs">
+      <div className="p-4">
         {aeropuertosFiltrados.length === 0 ? (
           <div className="py-8 text-center text-[#8d8d8d] text-sm">
             No se encontraron aeropuertos para la búsqueda.
@@ -105,7 +176,9 @@ export const AeropuertosView: React.FC = () => {
               return (
                 <div
                   key={aero.codigoIATA}
-                  className="border border-[#e0e0e0] p-3 bg-[#fbfbfb] hover:bg-white transition-colors"
+                  onClick={() => setAeropuertoFicha(aero)}
+                  title="Ver ficha del aeródromo"
+                  className="border border-[#e0e0e0] p-3 bg-[#fbfbfb] hover:bg-white hover:border-[#0f62fe] transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2">
@@ -156,21 +229,35 @@ export const AeropuertosView: React.FC = () => {
         )}
       </div>
 
+        {/* Barra de estado inferior */}
+        <div className="bg-[#f4f4f4] px-4 py-2 border-t border-[#e0e0e0] flex items-center justify-between text-xs text-[#525252]">
+          <span>
+            Mostrando <strong>{aeropuertosFiltrados.length}</strong> de{' '}
+            <strong>{aeropuertos.length}</strong> aeródromos
+          </span>
+        </div>
+      </div>
+
       {/* Modal Nuevo Aeropuerto */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white border border-[#393939] shadow-2xl w-full max-w-md my-8 rounded-none overflow-hidden">
             <div className="bg-[#161616] text-white px-6 py-4 flex items-center justify-between border-b border-[#393939]">
-              <h2 className="text-sm font-semibold">ALTA DE AEROPUERTO</h2>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-[#a8a8a8] hover:text-white p-1"
-              >
+              <h2 className="text-sm font-semibold">
+                {aeropuertoEditando ? 'EDITAR AEROPUERTO' : 'ALTA DE AEROPUERTO'}
+              </h2>
+              <button onClick={cerrarFormulario} className="text-[#a8a8a8] hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCrear} className="p-6 space-y-4">
+            <form onSubmit={handleGuardar} className="p-6 space-y-4">
+              {errorForm && (
+                <div className="bg-[#fff1f1] border-l-4 border-[#da1e28] p-3 text-xs text-[#da1e28]">
+                  {errorForm}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold uppercase mb-1">
                   Código IATA (3 letras) *
@@ -182,7 +269,13 @@ export const AeropuertosView: React.FC = () => {
                   onChange={(e) => setCodigoIATA(e.target.value.toUpperCase())}
                   placeholder="Ej: ROS, TUC, NQN"
                   required
-                  className="w-full bg-white border border-[#8d8d8d] px-3 py-1.5 text-xs font-mono font-bold uppercase"
+                  disabled={!!aeropuertoEditando}
+                  title={
+                    aeropuertoEditando
+                      ? 'El código IATA no se puede modificar: lo usan equipos y comisiones.'
+                      : undefined
+                  }
+                  className="w-full bg-white border border-[#8d8d8d] px-3 py-1.5 text-xs font-mono font-bold uppercase disabled:bg-[#f4f4f4] disabled:text-[#8d8d8d] disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -220,7 +313,7 @@ export const AeropuertosView: React.FC = () => {
               <div className="flex justify-end space-x-3 pt-3 border-t border-[#e0e0e0]">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={cerrarFormulario}
                   className="px-4 py-2 border border-[#8d8d8d] text-xs font-medium"
                 >
                   Cancelar
@@ -235,6 +328,16 @@ export const AeropuertosView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Ficha del aeródromo */}
+      {aeropuertoFicha && (
+        <AeropuertoFichaModal
+          aeropuerto={aeropuertoFicha}
+          onClose={() => setAeropuertoFicha(null)}
+          onEditar={abrirEdicion}
+          onVerComisiones={onVerComisiones}
+        />
       )}
     </div>
   );

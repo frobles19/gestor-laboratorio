@@ -28,12 +28,21 @@ import {
 import {
   formatearFecha,
   calcularDiscrepanciaDias,
+  getClasesEstadoComision,
 } from '../utils/maintenance';
 import { NuevaComisionModal } from './NuevaComisionModal';
 import { CierreComisionWizard } from './CierreComisionWizard';
 import { DetalleComisionModal } from './DetalleComisionModal';
 
-export const ComisionesView: React.FC = () => {
+interface ComisionesViewProps {
+  destinoInicial?: string;
+  tecnicoInicial?: string;
+}
+
+export const ComisionesView: React.FC<ComisionesViewProps> = ({
+  destinoInicial = '',
+  tecnicoInicial = '',
+}) => {
   const { comisiones, aeropuertos, nomina, cancelarComision, eliminarComision } = useApp();
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
@@ -71,8 +80,8 @@ export const ComisionesView: React.FC = () => {
   // Filtros individuales por columna
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
-  const [filtroColDestino, setFiltroColDestino] = useState('');
-  const [filtroColTecnico, setFiltroColTecnico] = useState('');
+  const [filtroColDestino, setFiltroColDestino] = useState(destinoInicial);
+  const [filtroColTecnico, setFiltroColTecnico] = useState(tecnicoInicial);
 
   // Filtros de selección múltiple para Transporte y Estado
   const TODOS_TRANSPORTES: MedioTransporte[] = ['Terrestre', 'Aéreo'];
@@ -248,7 +257,19 @@ export const ComisionesView: React.FC = () => {
         .filter(Boolean);
 
       if (terminosDestino.length > 0) {
+        const normalizar = (t: string) =>
+          t
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .trim();
+
         const todosDestinosCoinciden = terminosDestino.every((term) => {
+          // Si el término es el nombre completo de un aeropuerto se compara contra
+          // ese aeropuerto exacto (evita que "San Juan" traiga también "Marcos Juárez").
+          const aeroExacto = aeropuertos.find((a) => normalizar(a.nombreOficial) === term);
+          if (aeroExacto) return com.destinosAeropuertos.includes(aeroExacto.codigoIATA);
+
           return com.destinosAeropuertos.some((d) => {
             const dNorm = d
               .toLowerCase()
@@ -402,7 +423,7 @@ export const ComisionesView: React.FC = () => {
       <div className="bg-white p-4 border border-[#e0e0e0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#161616] tracking-tight">
-            CONTROL DE COMISIONES
+            MAESTRO DE COMISIONES
           </h1>
         </div>
 
@@ -444,84 +465,39 @@ export const ComisionesView: React.FC = () => {
 
       {/* Segundo Renglón: KPI Cards de Estados (Planificadas, En Curso, Finalizadas, Canceladas) uno al lado del otro */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* 1. Planificadas */}
-        <button
-          onClick={() => toggleFiltroCardEstado('Planificada')}
-          className={`p-3.5 text-left border transition-all cursor-pointer ${
-            filtrosEstado.length === 1 && filtrosEstado[0] === 'Planificada'
-              ? 'bg-white border-[#0f62fe] shadow-xs ring-1 ring-[#0f62fe]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-xs uppercase font-bold text-[#0043ce] tracking-wider flex items-center justify-between">
-            <span>Planificadas</span>
-            <Clock className="w-4 h-4 text-[#0f62fe]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-[#0043ce] mt-1">
-            {statsEstado.planificada}
-          </div>
-          <div className="text-xs text-[#525252] mt-1">Próximas a ejecutarse</div>
-        </button>
-
-        {/* 2. En Curso */}
-        <button
-          onClick={() => toggleFiltroCardEstado('En Curso')}
-          className={`p-3.5 text-left border transition-all cursor-pointer ${
-            filtrosEstado.length === 1 && filtrosEstado[0] === 'En Curso'
-              ? 'bg-white border-[#b28600] shadow-xs ring-1 ring-[#b28600]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-xs uppercase font-bold text-[#8a6d00] tracking-wider flex items-center justify-between">
-            <span>En Curso</span>
-            <span className="flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-[#b28600] animate-pulse"></span>
-              <Play className="w-3.5 h-3.5 text-[#8a6d00]" />
-            </span>
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-[#8a6d00] mt-1">
-            {statsEstado.enCurso}
-          </div>
-          <div className="text-xs text-[#525252] mt-1">En despliegue activo</div>
-        </button>
-
-        {/* 3. Finalizadas */}
-        <button
-          onClick={() => toggleFiltroCardEstado('Finalizada')}
-          className={`p-3.5 text-left border transition-all cursor-pointer ${
-            filtrosEstado.length === 1 && filtrosEstado[0] === 'Finalizada'
-              ? 'bg-white border-[#0e6027] shadow-xs ring-1 ring-[#0e6027]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-xs uppercase font-bold text-[#0e6027] tracking-wider flex items-center justify-between">
-            <span>Finalizadas</span>
-            <CheckCircle2 className="w-4 h-4 text-[#0e6027]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-[#0e6027] mt-1">
-            {statsEstado.finalizada}
-          </div>
-          <div className="text-xs text-[#525252] mt-1">Cerradas y cumplimentadas</div>
-        </button>
-
-        {/* 4. Canceladas */}
-        <button
-          onClick={() => toggleFiltroCardEstado('Cancelada')}
-          className={`p-3.5 text-left border transition-all cursor-pointer ${
-            filtrosEstado.length === 1 && filtrosEstado[0] === 'Cancelada'
-              ? 'bg-white border-[#da1e28] shadow-xs ring-1 ring-[#da1e28]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-xs uppercase font-bold text-[#da1e28] tracking-wider flex items-center justify-between">
-            <span>Canceladas</span>
-            <X className="w-4 h-4 text-[#da1e28]" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-[#da1e28] mt-1">
-            {statsEstado.cancelada}
-          </div>
-          <div className="text-xs text-[#525252] mt-1">No se realizaron</div>
-        </button>
+        {(
+          [
+            { estado: 'Planificada', titulo: 'Planificadas', valor: statsEstado.planificada, detalle: 'Próximas a ejecutarse', Icono: Clock },
+            { estado: 'En Curso', titulo: 'En Curso', valor: statsEstado.enCurso, detalle: 'En despliegue activo', Icono: Play },
+            { estado: 'Finalizada', titulo: 'Finalizadas', valor: statsEstado.finalizada, detalle: 'Cerradas y cumplimentadas', Icono: CheckCircle2 },
+            { estado: 'Cancelada', titulo: 'Canceladas', valor: statsEstado.cancelada, detalle: 'No se realizaron', Icono: X },
+          ] as const
+        ).map(({ estado, titulo, valor, detalle, Icono }) => {
+          const colores = getClasesEstadoComision(estado);
+          const seleccionada = filtrosEstado.length === 1 && filtrosEstado[0] === estado;
+          return (
+            <button
+              key={estado}
+              onClick={() => toggleFiltroCardEstado(estado)}
+              className={`p-3.5 text-left border transition-all cursor-pointer bg-white ${
+                seleccionada
+                  ? `${colores.ring} shadow-xs`
+                  : 'border-[#e0e0e0] hover:border-[#8d8d8d]'
+              }`}
+            >
+              <div
+                className={`text-xs uppercase font-bold tracking-wider flex items-center justify-between ${colores.text}`}
+              >
+                <span>{titulo}</span>
+                <Icono className="w-4 h-4" />
+              </div>
+              <div className={`text-2xl sm:text-3xl font-bold font-mono mt-1 ${colores.text}`}>
+                {valor}
+              </div>
+              <div className="text-xs text-[#525252] mt-1">{detalle}</div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Barra de Filtros por Tipo de Mantenimiento y Búsqueda */}
@@ -884,13 +860,7 @@ export const ComisionesView: React.FC = () => {
                       <td className="py-3 px-3.5 text-center border-r border-[#e0e0e0]">
                         <span
                           className={`w-28 h-7 inline-flex items-center justify-center text-xs font-bold uppercase tracking-wider ${
-                            com.estado === 'Finalizada'
-                              ? 'bg-[#defbe6] text-[#0e6027] border border-[#a7f0ba]'
-                              : com.estado === 'En Curso'
-                              ? 'bg-[#d0e2ff] text-[#002d9c] border border-[#a6c8ff]'
-                              : com.estado === 'Cancelada'
-                              ? 'bg-[#fff1f1] text-[#da1e28] border border-[#ffb3b8]'
-                              : 'bg-[#fef3d6] text-[#8a6100] border border-[#fddc69]'
+                            getClasesEstadoComision(com.estado).badge
                           }`}
                         >
                           {com.estado}
@@ -936,7 +906,7 @@ export const ComisionesView: React.FC = () => {
                             <Pencil className="w-4 h-4" />
                           </button>
 
-                          {/* Eliminar Comisión: abre la elección entre Cancelar y Eliminar definitivamente */}
+                          {/* Eliminar Comisión: abre la elección entre Cancelar y Eliminar */}
                           <button
                             onClick={() => puedeCancelarOEliminar && abrirAccionesComision(com)}
                             disabled={!puedeCancelarOEliminar}
@@ -1034,7 +1004,7 @@ export const ComisionesView: React.FC = () => {
                     className={`w-full flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border transition-colors ${
                       comisionParaAccion.estado === 'Cancelada'
                         ? 'bg-[#f4f4f4] text-[#c6c6c6] border-[#e0e0e0] cursor-not-allowed'
-                        : 'bg-white text-[#8a6100] border-[#fddc69] hover:bg-[#fef3d6] cursor-pointer'
+                        : 'bg-[#ffebee] text-[#da1e28] border-[#ffb3b8] hover:bg-[#ffd7d9] cursor-pointer'
                     }`}
                   >
                     <Ban className="w-4 h-4 shrink-0" />
@@ -1047,10 +1017,10 @@ export const ComisionesView: React.FC = () => {
 
                   <button
                     onClick={() => setPasoAccion('confirmarEliminar')}
-                    className="w-full flex items-center space-x-2 px-4 py-2.5 bg-white text-[#da1e28] border border-[#ffb3b8] hover:bg-[#fff1f1] text-xs font-bold transition-colors cursor-pointer"
+                    className="w-full flex items-center space-x-2 px-4 py-2.5 bg-[#da1e28] text-white border border-[#da1e28] hover:bg-[#a2191f] text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4 shrink-0" />
-                    <span>Eliminar Permanentemente</span>
+                    <span>Eliminar Comisión</span>
                   </button>
                 </div>
                 <div className="bg-[#f4f4f4] px-5 py-3 border-t border-[#e0e0e0] flex justify-end">
@@ -1088,7 +1058,7 @@ export const ComisionesView: React.FC = () => {
                   </button>
                   <button
                     onClick={confirmarCancelacion}
-                    className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#8a6100] hover:bg-[#6f4e00] text-white text-xs font-bold transition-colors cursor-pointer"
+                    className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#da1e28] hover:bg-[#a2191f] text-white text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Ban className="w-3.5 h-3.5" />
                     <span>Confirmar Cancelación</span>
@@ -1101,9 +1071,8 @@ export const ComisionesView: React.FC = () => {
               <>
                 <div className="p-5 space-y-3">
                   <p className="text-xs text-[#da1e28]">
-                    <strong>Esta acción no se puede deshacer.</strong> Se eliminará
-                    definitivamente la comisión {comisionParaAccion.codigo} y toda tarea o
-                    novedad asociada.
+                    Se eliminará la comisión <strong>{comisionParaAccion.codigo}</strong> del
+                    Maestro de Comisiones. El registro se conserva en el Historial.
                   </p>
                 </div>
                 <div className="bg-[#f4f4f4] px-5 py-3 border-t border-[#e0e0e0] flex justify-between">

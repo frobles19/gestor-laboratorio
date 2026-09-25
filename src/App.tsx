@@ -1,28 +1,56 @@
 import React, { useState } from 'react';
 import { AppProvider } from './context/AppContext';
-import { Header } from './components/Header';
+import { Header, VistaActiva } from './components/Header';
 import { ComisionesView } from './components/ComisionesView';
+import { LogsComisionesView } from './components/LogsComisionesView';
 import { RadioayudasView } from './components/RadioayudasView';
-import { NominaTecnicaView } from './components/NominaTecnicaView';
+import { TecnicosView } from './components/TecnicosView';
 import { AeropuertosView } from './components/AeropuertosView';
 import { Radio, Database, ShieldCheck, Server } from 'lucide-react';
 
 function MainApp() {
-  const [vistaActiva, setVistaActiva] = useState<
-    'comisiones' | 'radioayudas' | 'nomina' | 'aeropuertos'
-  >('comisiones');
+  const [vistaActiva, setVistaActiva] = useState<VistaActiva>('comisiones-maestro');
+  // Filtro de destino con el que se abre el Maestro cuando se llega desde otra pantalla.
+  const [destinoInicialComisiones, setDestinoInicialComisiones] = useState('');
+  const [tecnicoInicialComisiones, setTecnicoInicialComisiones] = useState('');
+
+  const cambiarVista = (vista: VistaActiva) => {
+    setDestinoInicialComisiones('');
+    setTecnicoInicialComisiones('');
+    setVistaActiva(vista);
+  };
+
+  const verComisionesDeAeropuerto = (nombreAeropuerto: string) => {
+    setDestinoInicialComisiones(nombreAeropuerto);
+    setTecnicoInicialComisiones('');
+    setVistaActiva('comisiones-maestro');
+  };
+
+  const verComisionesDeTecnico = (nombreTecnico: string) => {
+    setDestinoInicialComisiones('');
+    setTecnicoInicialComisiones(nombreTecnico);
+    setVistaActiva('comisiones-maestro');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f4f4] text-[#161616]">
       {/* Barra de cabecera estilo IBM Maximo Shell */}
-      <Header vistaActiva={vistaActiva} setVistaActiva={setVistaActiva} />
+      <Header vistaActiva={vistaActiva} setVistaActiva={cambiarVista} />
 
       {/* Contenedor Principal */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {vistaActiva === 'comisiones' && <ComisionesView />}
+        {vistaActiva === 'comisiones-maestro' && (
+          <ComisionesView
+            destinoInicial={destinoInicialComisiones}
+            tecnicoInicial={tecnicoInicialComisiones}
+          />
+        )}
+        {vistaActiva === 'comisiones-logs' && <LogsComisionesView />}
         {vistaActiva === 'radioayudas' && <RadioayudasView />}
-        {vistaActiva === 'nomina' && <NominaTecnicaView />}
-        {vistaActiva === 'aeropuertos' && <AeropuertosView />}
+        {vistaActiva === 'nomina' && <TecnicosView onVerComisiones={verComisionesDeTecnico} />}
+        {vistaActiva === 'aeropuertos' && (
+          <AeropuertosView onVerComisiones={verComisionesDeAeropuerto} />
+        )}
       </main>
 
       {/* Pie de Página estilo IBM Maximo Enterprise */}

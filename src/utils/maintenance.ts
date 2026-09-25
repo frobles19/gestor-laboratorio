@@ -1,4 +1,47 @@
-import { PuestoTecnico, Tecnico, NivelSemaforo, EstadoVencimiento } from '../types';
+import {
+  PuestoTecnico,
+  Tecnico,
+  NivelSemaforo,
+  EstadoVencimiento,
+  EstadoComision,
+} from '../types';
+
+/**
+ * Paleta única de colores por estado de comisión. Todas las pantallas
+ * (maestro, expediente, historial) deben usar estas clases para que el mismo
+ * estado se vea siempre igual.
+ * - badge: etiqueta de estado
+ * - text: texto/íconos de ese estado (ej. tarjetas KPI)
+ * - ring: borde de la tarjeta KPI cuando está seleccionada
+ */
+export function getClasesEstadoComision(estado: EstadoComision) {
+  switch (estado) {
+    case 'Planificada':
+      return {
+        badge: 'bg-[#fef3d6] text-[#8a6100] border border-[#fddc69]',
+        text: 'text-[#8a6100]',
+        ring: 'border-[#b28600] ring-1 ring-[#b28600]',
+      };
+    case 'En Curso':
+      return {
+        badge: 'bg-[#d0e2ff] text-[#002d9c] border border-[#a6c8ff]',
+        text: 'text-[#002d9c]',
+        ring: 'border-[#0f62fe] ring-1 ring-[#0f62fe]',
+      };
+    case 'Finalizada':
+      return {
+        badge: 'bg-[#defbe6] text-[#0e6027] border border-[#a7f0ba]',
+        text: 'text-[#0e6027]',
+        ring: 'border-[#0e6027] ring-1 ring-[#0e6027]',
+      };
+    case 'Cancelada':
+      return {
+        badge: 'bg-[#ffebee] text-[#da1e28] border border-[#ffb3b8]',
+        text: 'text-[#da1e28]',
+        ring: 'border-[#da1e28] ring-1 ring-[#da1e28]',
+      };
+  }
+}
 
 /**
  * Fecha de "hoy" en formato YYYY-MM-DD usando la hora LOCAL del navegador.
@@ -259,5 +302,49 @@ export function formatearFecha(fechaStr?: string): string {
     return fechaStr;
   } catch {
     return fechaStr;
+  }
+}
+
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+/**
+ * Formatea una fecha YYYY-MM-DD como "Mes Año" (ej: "Diciembre 2026").
+ */
+export function formatearMesAnio(fechaStr?: string): string {
+  if (!fechaStr) return '—';
+  const [y, m] = fechaStr.split('-');
+  const mes = MESES[parseInt(m, 10) - 1];
+  return mes && y ? `${mes} ${y}` : '—';
+}
+
+/**
+ * Nombre del tipo de mantenimiento preventivo que corresponde a la periodicidad
+ * configurada del equipo (ej: 3 meses -> "Trimestral").
+ */
+export function tipoPreventivoPorFrecuencia(meses: number): string {
+  switch (meses) {
+    case 1:
+      return 'Mensual';
+    case 3:
+      return 'Trimestral';
+    case 6:
+      return 'Semestral';
+    case 12:
+      return 'Anual';
+    default:
+      return `Cada ${meses} meses`;
   }
 }

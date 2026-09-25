@@ -9,6 +9,7 @@ export interface Aeropuerto {
   codigoIATA: string; // 3 letras, ej: EZE, AEP, COR
   nombreOficial: string;
   region: RegionAeronautica;
+  eliminadoAt?: string; // baja lógica: si existe, el aeropuerto no se lista pero su código queda reservado
 }
 
 export type SistemaRadioayuda = 'VOR' | 'DME' | 'ILS';
@@ -50,6 +51,10 @@ export interface Tecnico {
   dni: string;
   email: string;
   puesto: PuestoTecnico;
+  // false = personal externo al Laboratorio (se registra pero no integra su plantel)
+  laboratorio: boolean;
+  enLicencia?: boolean; // solo aplica al personal del Laboratorio
+  bajaAt?: string; // baja lógica: se conserva el registro por las comisiones que lo referencian
 }
 
 export type MedioTransporte = 'Terrestre' | 'Aéreo';
@@ -77,6 +82,7 @@ export interface ComisionServicio {
   createdAt: string;
   finalizadaAt?: string;
   canceladaAt?: string;
+  eliminadaAt?: string; // baja lógica: si existe, la comisión no se lista pero se conserva
   motivoCancelacion?: string;
 }
 
@@ -109,14 +115,6 @@ export interface IntervencionMantenimiento {
   tareaPendienteProximaVisita?: string; // Repuestos necesarios, obras de infraestructura, etc.
 }
 
-export interface NovedadComision {
-  id: string;
-  comisionId: string;
-  aeropuertoCodigo: string; // IATA
-  observacion: string;
-  fechaRegistro: string;
-}
-
 export type NivelSemaforo = 'AL_DIA' | 'PROXIMO_A_VENCER' | 'VENCIDO';
 
 export interface EstadoVencimiento {
@@ -126,4 +124,22 @@ export interface EstadoVencimiento {
   diasRestantes: number;
   nivel: NivelSemaforo;
   etiqueta: string;
+}
+
+// Auditoría / trazabilidad genérica, reutilizable por cualquier módulo del sistema.
+// Por ahora solo se registran eventos del módulo de Comisiones.
+export type ModuloAuditoria = 'COMISIONES';
+
+export type AccionAuditoria = 'CREAR' | 'EDITAR' | 'CANCELAR' | 'ELIMINAR' | 'CERRAR';
+
+export interface RegistroAuditoria {
+  id: string;
+  modulo: ModuloAuditoria;
+  entidadId: string;
+  entidadEtiqueta: string; // ej: código de la comisión, para mostrar sin tener que buscarla
+  accion: AccionAuditoria;
+  fecha: string; // ISO 8601 con hora
+  usuario: string;
+  estadoAnterior: Record<string, unknown> | null;
+  estadoNuevo: Record<string, unknown> | null;
 }

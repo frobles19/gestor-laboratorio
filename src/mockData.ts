@@ -5,7 +5,6 @@ import {
   Tecnico,
   ComisionServicio,
   IntervencionMantenimiento,
-  NovedadComision,
 } from './types';
 
 export const INITIAL_AEROPUERTOS: Aeropuerto[] = [
@@ -280,6 +279,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '23.451.902',
     email: 'cmendez@radioayudas.gov.ar',
     puesto: 'Jefe Departamento',
+    laboratorio: true,
   },
   {
     id: 'TEC-002',
@@ -288,6 +288,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '27.892.410',
     email: 'mgomez@radioayudas.gov.ar',
     puesto: 'Jefe Laboratorio',
+    laboratorio: true,
   },
   {
     id: 'TEC-003',
@@ -296,6 +297,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '29.102.345',
     email: 'rfernandez@radioayudas.gov.ar',
     puesto: 'Coordinador',
+    laboratorio: true,
   },
   {
     id: 'TEC-004',
@@ -304,6 +306,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '32.784.119',
     email: 'erossi@radioayudas.gov.ar',
     puesto: 'Coordinador Adjunto',
+    laboratorio: true,
   },
   {
     id: 'TEC-005',
@@ -312,6 +315,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '34.901.882',
     email: 'vcastro@radioayudas.gov.ar',
     puesto: 'Coordinador Adjunto',
+    laboratorio: true,
   },
   {
     id: 'TEC-006',
@@ -320,6 +324,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '36.442.109',
     email: 'lbenitez@radioayudas.gov.ar',
     puesto: 'Técnico',
+    laboratorio: true,
   },
   {
     id: 'TEC-007',
@@ -328,6 +333,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '38.129.004',
     email: 'gnavarro@radioayudas.gov.ar',
     puesto: 'Técnico',
+    laboratorio: true,
   },
   {
     id: 'TEC-008',
@@ -336,6 +342,7 @@ export const INITIAL_NOMINA: Tecnico[] = [
     dni: '39.554.810',
     email: 'fromero@radioayudas.gov.ar',
     puesto: 'Técnico',
+    laboratorio: true,
   },
 ];
 
@@ -414,16 +421,5 @@ export const INITIAL_INTERVENCIONES: IntervencionMantenimiento[] = [
       'Alineación de retardo de transpondedor a 50.00 microsegundos (+/- 0.05 us). Medición de eficiencia de respuesta al 85% de interrogación con 1200 pp/s. Limpieza de filtros y verificación de acoplador direccional.',
     estadoOperativoResultante: 'EN_SERVICIO',
     tareaPendienteProximaVisita: '',
-  },
-];
-
-export const INITIAL_NOVEDADES: NovedadComision[] = [
-  {
-    id: 'NOV-001',
-    comisionId: 'COM-2026-003',
-    aeropuertoCodigo: 'EZE',
-    observacion:
-      'Se observó fisura menor en el sellado del domo superior de la contraantena del DVOR. Se aplicó sellador poliuretánico provisional, programar mantenimiento civil.',
-    fechaRegistro: '2026-08-13',
   },
 ];

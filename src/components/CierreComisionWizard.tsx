@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   CheckCircle2,
   Calendar,
   Radio,
-  FileText,
   AlertTriangle,
   AlertCircle,
   ArrowRight,
@@ -44,12 +43,6 @@ interface TareaEquipoDraft {
   tareaPendienteProximaVisita: string;
 }
 
-interface NovedadDraft {
-  aeropuertoCodigo: string;
-  observacion: string;
-  fechaRegistro: string;
-}
-
 export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
   comision,
   isOpen,
@@ -60,8 +53,8 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
 
   const hoyStr = getHoyLocalStr();
 
-  // Estado del Wizard: Pasos 1 a 4
-  const [pasoActual, setPasoActual] = useState<1 | 2 | 3 | 4>(1);
+  // Estado del Wizard: Pasos 1 a 3
+  const [pasoActual, setPasoActual] = useState<1 | 2 | 3>(1);
 
   // Paso 1: Fechas reales y observaciones generales
   const [fechaSalidaReal, setFechaSalidaReal] = useState(
@@ -122,21 +115,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
   const [draftEstadoResultante, setDraftEstadoResultante] =
     useState<EstadoOperativo>('EN_SERVICIO');
   const [draftPendiente, setDraftPendiente] = useState<string>('');
-
-  // Paso 3: Novedades técnicas y de infraestructura
-  const [novedadesRegistradas, setNovedadesRegistradas] = useState<NovedadDraft[]>([]);
-  const [draftNovAeropuerto, setDraftNovAeropuerto] = useState<string>(
-    destinosVisitados[0] || ''
-  );
-  const [draftNovObs, setDraftNovObs] = useState<string>('');
-
-  // Si el aeropuerto elegido para la novedad deja de estar entre los efectivamente
-  // visitados (se quitó por fuerza mayor en el Paso 1), se reajusta la selección.
-  useEffect(() => {
-    if (!destinosVisitados.includes(draftNovAeropuerto)) {
-      setDraftNovAeropuerto(destinosVisitados[0] || '');
-    }
-  }, [destinosVisitados]);
 
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -199,32 +177,8 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
     setTareasRegistradas((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Agregar una novedad al listado del Paso 3
-  const handleAgregarNovedad = () => {
-    if (!draftNovObs.trim()) {
-      setErrorPaso('Ingrese la descripción de la novedad u observación.');
-      return;
-    }
-
-    setNovedadesRegistradas((prev) => [
-      ...prev,
-      {
-        aeropuertoCodigo: draftNovAeropuerto,
-        observacion: draftNovObs.trim(),
-        fechaRegistro: hoyStr,
-      },
-    ]);
-
-    setDraftNovObs('');
-    setErrorPaso(null);
-  };
-
-  const handleEliminarNovedad = (index: number) => {
-    setNovedadesRegistradas((prev) => prev.filter((_, i) => i !== index));
-  };
-
   // Navegación entre pasos con validación
-  const irAlPaso = (nuevoPaso: 1 | 2 | 3 | 4) => {
+  const irAlPaso = (nuevoPaso: 1 | 2 | 3) => {
     setErrorPaso(null);
 
     if (nuevoPaso > pasoActual) {
@@ -262,7 +216,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
           observacionesCierre.trim() ||
           `Cierre técnico formal de comisión ${comision.codigo}. Intervenciones registradas en sistema.`,
         intervencionesNuevas: tareasRegistradas,
-        novedadesNuevas: novedadesRegistradas,
       });
 
       if (onComisionCerrada) onComisionCerrada();
@@ -306,7 +259,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
 
         {/* Barra de Progreso de Pasos (Wizard Stepper) */}
         <div className="bg-[#262626] px-6 py-3 border-b border-[#393939]">
-          <div className="grid grid-cols-4 gap-2 text-xs">
+          <div className="grid grid-cols-3 gap-2 text-xs">
             <button
               onClick={() => irAlPaso(1)}
               className={`flex items-center space-x-2 p-2 text-left transition-colors ${
@@ -344,27 +297,11 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
               className={`flex items-center space-x-2 p-2 text-left transition-colors ${
                 pasoActual === 3
                   ? 'bg-[#0f62fe] text-white font-bold'
-                  : pasoActual > 3
-                  ? 'bg-[#393939] text-[#82cfff]'
                   : 'text-[#8d8d8d]'
               }`}
             >
               <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] shrink-0">
                 3
-              </span>
-              <span className="truncate">Novedades ({novedadesRegistradas.length})</span>
-            </button>
-
-            <button
-              onClick={() => irAlPaso(4)}
-              className={`flex items-center space-x-2 p-2 text-left transition-colors ${
-                pasoActual === 4
-                  ? 'bg-[#0f62fe] text-white font-bold'
-                  : 'text-[#8d8d8d]'
-              }`}
-            >
-              <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] shrink-0">
-                4
               </span>
               <span className="truncate">Balance y Cierre</span>
             </button>
@@ -776,7 +713,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                                   : item.tipoIntervencion}
                               </span>
                               {item.subtipoVerificacionAerea === 'Con alarmas' && (
-                                <span className="px-2 py-0.5 text-xs font-bold border bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]">
+                                <span className="px-2 py-0.5 text-xs font-bold border bg-[#ffebee] text-[#da1e28] border-[#ffb3b8]">
                                   Con alarmas
                                 </span>
                               )}
@@ -825,107 +762,8 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
             </div>
           )}
 
-          {/* PASO 3: NOVEDADES POR AEROPUERTO */}
+          {/* PASO 3: BALANCE Y CIERRE */}
           {pasoActual === 3 && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xs font-bold text-[#161616] uppercase tracking-wider flex items-center space-x-2">
-                  <FileText className="w-4 h-4 text-[#0f62fe]" />
-                  <span>Paso 3: Novedades Técnicas o de Infraestructura por Aeropuerto</span>
-                </h3>
-                <p className="text-xs text-[#525252] mt-0.5">
-                  Registre observaciones de sitio, fallas en suministros eléctricos, estado de
-                  casetas, accesos viales o temas de infraestructura aeronáutica.
-                </p>
-              </div>
-
-              {/* Formulario de carga de novedad */}
-              <div className="bg-[#f4f4f4] p-4 border border-[#e0e0e0] space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
-                    Aeropuerto Afectado *
-                  </label>
-                  <select
-                    value={draftNovAeropuerto}
-                    onChange={(e) => setDraftNovAeropuerto(e.target.value)}
-                    className="w-full bg-white border border-[#8d8d8d] px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe]"
-                  >
-                    {destinosVisitados.map((cod) => {
-                      const a = aeropuertos.find((ar) => ar.codigoIATA === cod);
-                      return (
-                        <option key={cod} value={cod}>
-                          {cod} - {a?.nombreOficial}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#161616] uppercase mb-1">
-                    Descripción de la Novedad / Observación *
-                  </label>
-                  <textarea
-                    value={draftNovObs}
-                    onChange={(e) => setDraftNovObs(e.target.value)}
-                    rows={2}
-                    placeholder="Ej: Se detectó humedad en sector de transformador de aislamiento de la cabecera 35R..."
-                    className="w-full bg-white border border-[#8d8d8d] p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0f62fe]"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleAgregarNovedad}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#262626] hover:bg-[#393939] text-white text-xs font-medium transition-colors border border-[#525252]"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Agregar Novedad</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Lista de novedades registradas */}
-              <div className="border border-[#e0e0e0]">
-                <div className="bg-[#262626] text-white px-3 py-2 text-xs font-semibold flex items-center justify-between">
-                  <span>Novedades Agrupadas por Aeropuerto ({novedadesRegistradas.length})</span>
-                </div>
-
-                {novedadesRegistradas.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-[#8d8d8d]">
-                    No se han ingresado novedades para los aeropuertos visitados. (Opcional).
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[#e0e0e0]">
-                    {novedadesRegistradas.map((nov, idx) => (
-                      <div key={idx} className="p-3 bg-white flex items-start justify-between text-xs">
-                        <div>
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-mono font-bold bg-[#0f62fe] text-white px-2 py-0.5">
-                              {nov.aeropuertoCodigo}
-                            </span>
-                            <span className="text-[#6f6f6f]">• {formatearFecha(nov.fechaRegistro)}</span>
-                          </div>
-                          <p className="text-[#525252]">{nov.observacion}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarNovedad(idx)}
-                          className="text-[#da1e28] hover:bg-[#fff1f1] p-1 rounded ml-2"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* PASO 4: BALANCE Y CIERRE */}
-          {pasoActual === 4 && (
             <div className="space-y-4">
               <div className="bg-[#defbe6] border-l-4 border-[#198038] p-3 text-xs text-[#0e6027]">
                 <div className="font-bold text-sm flex items-center space-x-2">
@@ -977,9 +815,6 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                       <strong>Tareas a impactar:</strong> {tareasRegistradas.length} registradas
                     </div>
                     <div>
-                      <strong>Novedades técnicas:</strong> {novedadesRegistradas.length} registradas
-                    </div>
-                    <div>
                       <strong>Equipos actualizados:</strong>{' '}
                       {Array.from(new Set(tareasRegistradas.map((t) => t.equipoId)))
                         .map((id) => equipos.find((e) => e.id === id)?.identificador)
@@ -1010,7 +845,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
                                 : t.tipoIntervencion}
                             </span>
                             {t.subtipoVerificacionAerea === 'Con alarmas' && (
-                              <span className="px-2 py-0.5 text-[11px] font-bold border bg-[#fff1f1] text-[#da1e28] border-[#ffb3b8]">
+                              <span className="px-2 py-0.5 text-[11px] font-bold border bg-[#ffebee] text-[#da1e28] border-[#ffb3b8]">
                                 Con alarmas
                               </span>
                             )}
@@ -1051,7 +886,7 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
             {pasoActual > 1 ? (
               <button
                 type="button"
-                onClick={() => irAlPaso((pasoActual - 1) as 1 | 2 | 3)}
+                onClick={() => irAlPaso((pasoActual - 1) as 1 | 2)}
                 className="flex items-center space-x-1.5 px-3 py-1.5 border border-[#8d8d8d] text-xs font-medium text-[#161616] hover:bg-[#e0e0e0] transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -1069,10 +904,10 @@ export const CierreComisionWizard: React.FC<CierreComisionWizardProps> = ({
           </div>
 
           <div className="flex items-center space-x-3">
-            {pasoActual < 4 ? (
+            {pasoActual < 3 ? (
               <button
                 type="button"
-                onClick={() => irAlPaso((pasoActual + 1) as 2 | 3 | 4)}
+                onClick={() => irAlPaso((pasoActual + 1) as 2 | 3)}
                 className="flex items-center space-x-1.5 px-4 py-2 bg-[#0f62fe] hover:bg-[#0353e9] text-white text-xs font-semibold tracking-wide transition-colors"
               >
                 <span>Siguiente Paso</span>

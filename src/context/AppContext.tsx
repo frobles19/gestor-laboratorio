@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   Aeropuerto,
   ModeloEquipo,
@@ -6,9 +6,10 @@ import {
   Tecnico,
   ComisionServicio,
   IntervencionMantenimiento,
-  NovedadComision,
   EstadoComision,
   TipoIntervencion,
+  RegistroAuditoria,
+  AccionAuditoria,
 } from '../types';
 import {
   INITIAL_AEROPUERTOS,
@@ -17,7 +18,6 @@ import {
   INITIAL_NOMINA,
   INITIAL_COMISIONES,
   INITIAL_INTERVENCIONES,
-  INITIAL_NOVEDADES,
 } from '../mockData';
 import {
   determinarJefeComision,
@@ -31,9 +31,10 @@ interface AppContextType {
   modelos: ModeloEquipo[];
   equipos: EquipoInstalado[];
   nomina: Tecnico[];
-  comisiones: ComisionServicio[];
+  comisiones: ComisionServicio[]; // solo las visibles (excluye las eliminadas)
+  comisionesEliminadas: ComisionServicio[]; // baja lógica: se conservan para el historial
   intervenciones: IntervencionMantenimiento[];
-  novedades: NovedadComision[];
+  auditoria: RegistroAuditoria[];
 
   // Acciones de Comisiones
   crearComision: (
@@ -57,7 +58,6 @@ interface AppContextType {
     destinosVisitados?: string[];
     observacionesCierre: string;
     intervencionesNuevas: Omit<IntervencionMantenimiento, 'id' | 'comisionId'>[];
-    novedadesNuevas: Omit<NovedadComision, 'id' | 'comisionId'>[];
   }) => void;
 
   // Acciones de Equipos e Inventario
@@ -66,9 +66,15 @@ interface AppContextType {
 
   // Acciones de Nómina
   guardarTecnico: (tecnico: Tecnico) => void;
+  darDeBajaTecnico: (id: string) => void;
 
   // Acciones de Aeropuertos
-  guardarAeropuerto: (aeropuerto: Aeropuerto) => void;
+  crearAeropuerto: (datos: Pick<Aeropuerto, 'codigoIATA' | 'nombreOficial' | 'region'>) => void;
+  actualizarAeropuerto: (
+    codigoIATA: string,
+    datos: Pick<Aeropuerto, 'nombreOficial' | 'region'>
+  ) => void;
+  eliminarAeropuerto: (codigoIATA: string) => void;
 
   // Utilidades
   restaurarDatosIniciales: () => void;
@@ -85,8 +91,12 @@ const STORAGE_KEYS = {
   NOMINA: 'maximo_radioayudas_nomina_v1',
   COMISIONES: 'maximo_radioayudas_comisiones_v1',
   INTERVENCIONES: 'maximo_radioayudas_intervenciones_v1',
-  NOVEDADES: 'maximo_radioayudas_novedades_v1',
+  AUDITORIA: 'maximo_radioayudas_auditoria_v1',
 };
+
+// Usuario fijo de la sesión actual: el sistema todavía no tiene autenticación
+// multiusuario, por lo que toda acción auditada se atribuye a este usuario.
+const USUARIO_ACTUAL = 'Ing. Fran';
 
 const TIPOS_INTERVENCION_VALIDOS: TipoIntervencion[] = [
   'Verificación',
@@ -122,10 +132,15 @@ function migrarComisionLegacy(raw: any): ComisionServicio {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [aeropuertos, setAeropuertos] = useState<Aeropuerto[]>(() => {
+  // Todos los aeropuertos, incluidos los dados de baja (baja lógica).
+  const [aeropuertosTodos, setAeropuertos] = useState<Aeropuerto[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.AEROPUERTOS);
     return saved ? JSON.parse(saved) : INITIAL_AEROPUERTOS;
   });
+  const aeropuertos = useMemo(
+    () => aeropuertosTodos.filter((a) => !a.eliminadoAt),
+    [aeropuertosTodos]
+  );
 
   const [modelos, setModelos] = useState<ModeloEquipo[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.MODELOS);
@@ -139,29 +154,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [nomina, setNomina] = useState<Tecnico[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.NOMINA);
-    return saved ? JSON.parse(saved) : INITIAL_NOMINA;
+    const datos: Tecnico[] = saved ? JSON.parse(saved) : INITIAL_NOMINA;
+    // Registros anteriores al campo "laboratorio": se asumen del Laboratorio.
+    return datos.map((t) => ({ ...t, laboratorio: t.laboratorio !== false }));
   });
 
-  const [comisiones, setComisiones] = useState<ComisionServicio[]>(() => {
+  // Todas las comisiones, incluidas las eliminadas (baja lógica).
+  const [comisionesTodas, setComisiones] = useState<ComisionServicio[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.COMISIONES);
     const datos = saved ? JSON.parse(saved) : INITIAL_COMISIONES;
     return datos.map(migrarComisionLegacy);
   });
+
+  // Una comisión eliminada no aparece en ninguna pantalla operativa, pero su
+  // registro se conserva (y su código queda reservado) para el historial.
+  const comisiones = useMemo(
+    () => comisionesTodas.filter((c) => !c.eliminadaAt),
+    [comisionesTodas]
+  );
+  const comisionesEliminadas = useMemo(
+    () => comisionesTodas.filter((c) => !!c.eliminadaAt),
+    [comisionesTodas]
+  );
 
   const [intervenciones, setIntervenciones] = useState<IntervencionMantenimiento[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.INTERVENCIONES);
     return saved ? JSON.parse(saved) : INITIAL_INTERVENCIONES;
   });
 
-  const [novedades, setNovedades] = useState<NovedadComision[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOVEDADES);
-    return saved ? JSON.parse(saved) : INITIAL_NOVEDADES;
+  const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AUDITORIA);
+    return saved ? JSON.parse(saved) : [];
   });
 
   // Guardar en localStorage ante cambios
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AEROPUERTOS, JSON.stringify(aeropuertos));
-  }, [aeropuertos]);
+    localStorage.setItem(STORAGE_KEYS.AEROPUERTOS, JSON.stringify(aeropuertosTodos));
+  }, [aeropuertosTodos]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.MODELOS, JSON.stringify(modelos));
@@ -176,16 +205,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [nomina]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COMISIONES, JSON.stringify(comisiones));
-  }, [comisiones]);
+    localStorage.setItem(STORAGE_KEYS.COMISIONES, JSON.stringify(comisionesTodas));
+  }, [comisionesTodas]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.INTERVENCIONES, JSON.stringify(intervenciones));
   }, [intervenciones]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOVEDADES, JSON.stringify(novedades));
-  }, [novedades]);
+    localStorage.setItem(STORAGE_KEYS.AUDITORIA, JSON.stringify(auditoria));
+  }, [auditoria]);
+
+  // Registra un evento de auditoría genérico (por ahora solo se invoca desde
+  // el módulo de Comisiones, pero el mecanismo es reutilizable por cualquier
+  // otro módulo que necesite trazabilidad de sus acciones).
+  const registrarAuditoria = (
+    accion: AccionAuditoria,
+    entidadId: string,
+    entidadEtiqueta: string,
+    estadoAnterior: Record<string, unknown> | null,
+    estadoNuevo: Record<string, unknown> | null
+  ) => {
+    const registro: RegistroAuditoria = {
+      id: generarId('AUD'),
+      modulo: 'COMISIONES',
+      entidadId,
+      entidadEtiqueta,
+      accion,
+      fecha: new Date().toISOString(),
+      usuario: USUARIO_ACTUAL,
+      estadoAnterior,
+      estadoNuevo,
+    };
+    setAuditoria((prev) => [registro, ...prev]);
+  };
 
   // Regla de Negocio:
   // Toda comisión en estado de 'Planificada' pasa a estar 'En Curso' cuando la fecha está dentro del rango de fechas de la comisión.
@@ -195,7 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComisiones((prev) => {
       let cambio = false;
       const actualizadas = prev.map((com) => {
-        if (com.estado === 'Planificada') {
+        if (com.estado === 'Planificada' && !com.eliminadaAt) {
           const evaluado = evaluarEstadoComisionSegunFecha(com, hoyStr);
           if (evaluado !== com.estado) {
             cambio = true;
@@ -261,10 +314,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const anio = new Date().getFullYear();
 
     // Generación de código único: se busca el próximo secuencial libre en vez de
-    // confiar en comisiones.length, que puede colisionar si se llegaran a borrar
-    // comisiones o si dos creaciones ocurren con un state todavía no actualizado.
-    const codigosExistentes = new Set(comisiones.map((c) => c.codigo));
-    let numeroSecuencial = comisiones.length + 1;
+    // confiar en la cantidad de comisiones. Se consideran también las eliminadas
+    // (baja lógica) para no reutilizar nunca un código ya emitido.
+    const codigosExistentes = new Set(comisionesTodas.map((c) => c.codigo));
+    let numeroSecuencial = comisionesTodas.length + 1;
     let codigo = `COM-${anio}-${String(numeroSecuencial).padStart(3, '0')}`;
     while (codigosExistentes.has(codigo)) {
       numeroSecuencial += 1;
@@ -300,10 +353,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setComisiones((prev) => [nuevaComision, ...prev]);
+    registrarAuditoria('CREAR', id, codigo, null, nuevaComision as unknown as Record<string, unknown>);
     return nuevaComision;
   };
 
   const actualizarComision = (comisionActualizada: ComisionServicio) => {
+    const comisionAnterior = comisiones.find((c) => c.id === comisionActualizada.id) || null;
+
     // Si cambiaron técnicos, recalcular automáticamente el Jefe de Comisión
     const jefe = determinarJefeComision(comisionActualizada.tecnicosIds, nomina);
     const jefeFinalId = jefe ? jefe.id : comisionActualizada.jefeComisionId;
@@ -315,6 +371,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setComisiones((prev) =>
       prev.map((c) => (c.id === objetoFinal.id ? objetoFinal : c))
+    );
+    registrarAuditoria(
+      'EDITAR',
+      objetoFinal.id,
+      objetoFinal.codigo,
+      comisionAnterior as unknown as Record<string, unknown> | null,
+      objetoFinal as unknown as Record<string, unknown>
     );
   };
 
@@ -329,17 +392,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (comision.estado === 'Cancelada') {
       throw new Error('Esta comisión ya fue cancelada.');
     }
+    const comisionCancelada: ComisionServicio = {
+      ...comision,
+      estado: 'Cancelada' as EstadoComision,
+      canceladaAt: getHoyLocalStr(),
+      motivoCancelacion: motivo?.trim() || undefined,
+    };
+
     setComisiones((prev) =>
-      prev.map((c) =>
-        c.id === comisionId
-          ? {
-              ...c,
-              estado: 'Cancelada' as EstadoComision,
-              canceladaAt: getHoyLocalStr(),
-              motivoCancelacion: motivo?.trim() || undefined,
-            }
-          : c
-      )
+      prev.map((c) => (c.id === comisionId ? comisionCancelada : c))
+    );
+    registrarAuditoria(
+      'CANCELAR',
+      comision.id,
+      comision.codigo,
+      comision as unknown as Record<string, unknown>,
+      comisionCancelada as unknown as Record<string, unknown>
     );
   };
 
@@ -353,11 +421,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'No se puede eliminar una comisión finalizada: es un registro histórico de trabajo realizado. Si nunca se realizó, cancélela en vez de eliminarla.'
       );
     }
-    setComisiones((prev) => prev.filter((c) => c.id !== comisionId));
-    // Limpieza defensiva: una comisión no Finalizada no debería tener intervenciones/novedades
-    // asociadas (esas solo se generan en cerrarComisionConFlujo), pero se filtran igual por las dudas.
-    setIntervenciones((prev) => prev.filter((i) => i.comisionId !== comisionId));
-    setNovedades((prev) => prev.filter((n) => n.comisionId !== comisionId));
+    // Baja lógica: la comisión deja de listarse pero el registro se conserva.
+    setComisiones((prev) =>
+      prev.map((c) => (c.id === comisionId ? { ...c, eliminadaAt: new Date().toISOString() } : c))
+    );
+    registrarAuditoria(
+      'ELIMINAR',
+      comision.id,
+      comision.codigo,
+      comision as unknown as Record<string, unknown>,
+      null
+    );
   };
 
   const cerrarComisionConFlujo = (datosCierre: {
@@ -367,10 +441,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     destinosVisitados?: string[];
     observacionesCierre: string;
     intervencionesNuevas: Omit<IntervencionMantenimiento, 'id' | 'comisionId'>[];
-    novedadesNuevas: Omit<NovedadComision, 'id' | 'comisionId'>[];
   }) => {
     // Guardia de idempotencia: no se puede cerrar una comisión inexistente
-    // o que ya fue Finalizada (evita duplicar intervenciones/novedades y
+    // o que ya fue Finalizada (evita duplicar intervenciones y
     // sobrescribir los datos de cierre si el flujo se dispara dos veces).
     const comisionActual = comisiones.find((c) => c.id === datosCierre.comisionId);
     if (!comisionActual) {
@@ -412,16 +485,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...item,
         id: generarId('INT'),
         comisionId: datosCierre.comisionId,
-      })
-    );
-
-    // 2. Crear las novedades con IDs únicos
-    const nuevasNovedades: NovedadComision[] = datosCierre.novedadesNuevas.map(
-      (nov) => ({
-        ...nov,
-        id: generarId('NOV'),
-        comisionId: datosCierre.comisionId,
-        fechaRegistro: nov.fechaRegistro || hoyStr,
       })
     );
 
@@ -485,37 +548,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return actualizados;
     });
 
-    // 4. Agregar intervenciones y novedades al estado
+    // 4. Agregar intervenciones al estado
     if (nuevasIntervenciones.length > 0) {
       setIntervenciones((prev) => [...prev, ...nuevasIntervenciones]);
     }
-    if (nuevasNovedades.length > 0) {
-      setNovedades((prev) => [...prev, ...nuevasNovedades]);
-    }
 
     // 5. Marcar comisión como Finalizada, guardar fechas reales, destinos visitados y reemplazar el/los tipo(s) de mantenimiento previstos por todos los realmente realizados
-    setComisiones((prev) =>
-      prev.map((com) => {
-        if (com.id === datosCierre.comisionId) {
-          // Extraer todos los tipos de mantenimiento únicos realizados en las tareas de la comisión.
-          // Una comisión puede terminar abarcando más de un tipo (ej. Verificación + Preventivo).
-          const tiposRealizados = Array.from(
-            new Set(datosCierre.intervencionesNuevas.map((t) => t.tipoIntervencion))
-          );
+    // Extraer todos los tipos de mantenimiento únicos realizados en las tareas de la comisión.
+    // Una comisión puede terminar abarcando más de un tipo (ej. Verificación + Preventivo).
+    const tiposRealizados = Array.from(
+      new Set(datosCierre.intervencionesNuevas.map((t) => t.tipoIntervencion))
+    );
 
-          return {
-            ...com,
-            estado: 'Finalizada' as EstadoComision,
-            tiposMantenimiento: tiposRealizados.length > 0 ? tiposRealizados : com.tiposMantenimiento,
-            fechaSalidaReal: datosCierre.fechaSalidaReal,
-            fechaRegresoReal: datosCierre.fechaRegresoReal,
-            destinosAeropuertos: destinosVisitados,
-            observacionesCierre: datosCierre.observacionesCierre,
-            finalizadaAt: hoyStr,
-          };
-        }
-        return com;
-      })
+    const comisionFinalizada: ComisionServicio = {
+      ...comisionActual,
+      estado: 'Finalizada' as EstadoComision,
+      tiposMantenimiento: tiposRealizados.length > 0 ? tiposRealizados : comisionActual.tiposMantenimiento,
+      fechaSalidaReal: datosCierre.fechaSalidaReal,
+      fechaRegresoReal: datosCierre.fechaRegresoReal,
+      destinosAeropuertos: destinosVisitados,
+      observacionesCierre: datosCierre.observacionesCierre,
+      finalizadaAt: hoyStr,
+    };
+
+    setComisiones((prev) =>
+      prev.map((com) => (com.id === datosCierre.comisionId ? comisionFinalizada : com))
+    );
+    registrarAuditoria(
+      'CERRAR',
+      comisionActual.id,
+      comisionActual.codigo,
+      comisionActual as unknown as Record<string, unknown>,
+      comisionFinalizada as unknown as Record<string, unknown>
     );
   };
 
@@ -543,20 +607,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const guardarAeropuerto = (aeropuerto: Aeropuerto) => {
-    setAeropuertos((prev) => {
-      const existe = prev.some(
-        (a) => a.codigoIATA.toUpperCase() === aeropuerto.codigoIATA.toUpperCase()
+  // Baja lógica: el técnico deja de listarse y de poder designarse, pero las
+  // comisiones anteriores siguen mostrando su nombre.
+  const darDeBajaTecnico = (id: string) => {
+    if (!nomina.some((t) => t.id === id && !t.bajaAt)) {
+      throw new Error('El técnico indicado no existe.');
+    }
+    const activas = comisiones.filter(
+      (c) => (c.estado === 'Planificada' || c.estado === 'En Curso') && c.tecnicosIds.includes(id)
+    ).length;
+    if (activas > 0) {
+      throw new Error(`No se puede dar de baja: está designado en ${activas} comisión(es) sin finalizar.`);
+    }
+    setNomina((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, bajaAt: new Date().toISOString() } : t))
+    );
+  };
+
+  const crearAeropuerto = (datos: Pick<Aeropuerto, 'codigoIATA' | 'nombreOficial' | 'region'>) => {
+    const codigo = datos.codigoIATA.trim().toUpperCase();
+    const nombre = datos.nombreOficial.trim();
+    if (!/^[A-Z]{3}$/.test(codigo)) {
+      throw new Error('El código IATA debe tener exactamente 3 letras.');
+    }
+    if (!nombre) {
+      throw new Error('El nombre oficial es obligatorio.');
+    }
+    // Se compara contra todos (incluidos los dados de baja) para no reutilizar un código.
+    if (aeropuertosTodos.some((a) => a.codigoIATA.toUpperCase() === codigo)) {
+      throw new Error(`El código ${codigo} ya está registrado.`);
+    }
+    setAeropuertos((prev) => [
+      ...prev,
+      { codigoIATA: codigo, nombreOficial: nombre, region: datos.region },
+    ]);
+  };
+
+  // El código IATA no se puede modificar: es la clave con la que lo referencian
+  // equipos y comisiones.
+  const actualizarAeropuerto = (
+    codigoIATA: string,
+    datos: Pick<Aeropuerto, 'nombreOficial' | 'region'>
+  ) => {
+    if (!aeropuertos.some((a) => a.codigoIATA === codigoIATA)) {
+      throw new Error('El aeropuerto indicado no existe.');
+    }
+    const nombre = datos.nombreOficial.trim();
+    if (!nombre) {
+      throw new Error('El nombre oficial es obligatorio.');
+    }
+    setAeropuertos((prev) =>
+      prev.map((a) =>
+        a.codigoIATA === codigoIATA ? { ...a, nombreOficial: nombre, region: datos.region } : a
+      )
+    );
+  };
+
+  // Baja lógica. Se bloquea si el aeropuerto todavía tiene equipos o comisiones
+  // asociadas, para no dejar referencias a un aeropuerto que ya no se lista.
+  const eliminarAeropuerto = (codigoIATA: string) => {
+    if (!aeropuertos.some((a) => a.codigoIATA === codigoIATA)) {
+      throw new Error('El aeropuerto indicado no existe.');
+    }
+    const cantEquipos = equipos.filter((e) => e.aeropuertoCodigo === codigoIATA).length;
+    if (cantEquipos > 0) {
+      throw new Error(
+        `No se puede eliminar ${codigoIATA}: tiene ${cantEquipos} radioayuda(s) instalada(s).`
       );
-      if (existe) {
-        return prev.map((a) =>
-          a.codigoIATA.toUpperCase() === aeropuerto.codigoIATA.toUpperCase()
-            ? aeropuerto
-            : a
-        );
-      }
-      return [...prev, aeropuerto];
-    });
+    }
+    const cantComisiones = comisiones.filter((c) =>
+      c.destinosAeropuertos.includes(codigoIATA)
+    ).length;
+    if (cantComisiones > 0) {
+      throw new Error(
+        `No se puede eliminar ${codigoIATA}: figura en ${cantComisiones} comisión(es).`
+      );
+    }
+    setAeropuertos((prev) =>
+      prev.map((a) =>
+        a.codigoIATA === codigoIATA ? { ...a, eliminadoAt: new Date().toISOString() } : a
+      )
+    );
   };
 
   const restaurarDatosIniciales = () => {
@@ -571,7 +702,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem(STORAGE_KEYS.NOMINA);
       localStorage.removeItem(STORAGE_KEYS.COMISIONES);
       localStorage.removeItem(STORAGE_KEYS.INTERVENCIONES);
-      localStorage.removeItem(STORAGE_KEYS.NOVEDADES);
+      localStorage.removeItem(STORAGE_KEYS.AUDITORIA);
 
       setAeropuertos(INITIAL_AEROPUERTOS);
       setModelos(INITIAL_MODELOS);
@@ -579,7 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNomina(INITIAL_NOMINA);
       setComisiones(INITIAL_COMISIONES);
       setIntervenciones(INITIAL_INTERVENCIONES);
-      setNovedades(INITIAL_NOVEDADES);
+      setAuditoria([]);
     }
   };
 
@@ -591,8 +722,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         equipos,
         nomina,
         comisiones,
+        comisionesEliminadas,
         intervenciones,
-        novedades,
+        auditoria,
         crearComision,
         actualizarComision,
         cancelarComision,
@@ -601,7 +733,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         guardarEquipo,
         eliminarEquipo,
         guardarTecnico,
-        guardarAeropuerto,
+        darDeBajaTecnico,
+        crearAeropuerto,
+        actualizarAeropuerto,
+        eliminarAeropuerto,
         restaurarDatosIniciales,
         getEquipoPorId,
         getModeloPorId,
