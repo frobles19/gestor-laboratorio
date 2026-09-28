@@ -19,6 +19,7 @@ export interface ModeloEquipo {
   sistema: SistemaRadioayuda;
   denominacion: string; // ej: "Doppler VOR 432", "NORMARC 7000B"
   fabricante: string;   // ej: "Thales ATM", "Indra Sistemas", "Selex ES"
+  eliminadoAt?: string; // baja lógica: si existe, el modelo no se lista pero el id queda reservado
 }
 
 export type EstadoOperativo = 'EN_SERVICIO' | 'FUERA_DE_SERVICIO';
@@ -42,7 +43,8 @@ export type PuestoTecnico =
   | 'Jefe Laboratorio' 
   | 'Coordinador' 
   | 'Coordinador Adjunto' 
-  | 'Técnico';
+  | 'Técnico'
+  | 'Instructor';
 
 export interface Tecnico {
   id: string;

@@ -4,7 +4,24 @@ import {
   NivelSemaforo,
   EstadoVencimiento,
   EstadoComision,
+  SistemaRadioayuda,
 } from '../types';
+
+/**
+ * Paleta única de colores por sistema de radioayuda (VOR/DME/ILS), para que
+ * se vea igual en el Maestro de Modelos, el Inventario y cualquier otra
+ * pantalla que necesite distinguirlos.
+ */
+export function getClasesSistema(sistema: SistemaRadioayuda) {
+  switch (sistema) {
+    case 'VOR':
+      return { badge: 'bg-[#e8daff] text-[#6929c4] border border-[#d4bbff]' };
+    case 'DME':
+      return { badge: 'bg-[#d9fbfb] text-[#005d5d] border border-[#9ef0f0]' };
+    case 'ILS':
+      return { badge: 'bg-[#fff8e1] text-[#8a6100] border border-[#fddc69]' };
+  }
+}
 
 /**
  * Paleta única de colores por estado de comisión. Todas las pantallas
@@ -72,6 +89,7 @@ export const JERARQUIA_VALOR: Record<PuestoTecnico, number> = {
   'Coordinador': 3,
   'Coordinador Adjunto': 4,
   'Técnico': 5,
+  'Instructor': 6,
 };
 
 /**

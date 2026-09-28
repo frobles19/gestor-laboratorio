@@ -12,23 +12,21 @@ import {
   AccionAuditoria,
 } from '../types';
 import {
-  INITIAL_AEROPUERTOS,
-  INITIAL_MODELOS,
-  INITIAL_EQUIPOS,
-  INITIAL_NOMINA,
-  INITIAL_COMISIONES,
-  INITIAL_INTERVENCIONES,
-} from '../mockData';
-import {
   determinarJefeComision,
   evaluarEstadoComisionSegunFecha,
   getHoyLocalStr,
   generarId,
 } from '../utils/maintenance';
+import * as repo from '../lib/repo';
 
 interface AppContextType {
+  cargando: boolean;
+  errorCarga: string | null;
+  errorSync: string | null;
+  limpiarErrorSync: () => void;
+
   aeropuertos: Aeropuerto[];
-  modelos: ModeloEquipo[];
+  modelos: ModeloEquipo[]; // solo los visibles (excluye los dados de baja)
   equipos: EquipoInstalado[];
   nomina: Tecnico[];
   comisiones: ComisionServicio[]; // solo las visibles (excluye las eliminadas)
@@ -76,98 +74,60 @@ interface AppContextType {
   ) => void;
   eliminarAeropuerto: (codigoIATA: string) => void;
 
+  // Acciones de Modelos de Equipo
+  crearModelo: (datos: Pick<ModeloEquipo, 'sistema' | 'denominacion' | 'fabricante'>) => void;
+  actualizarModelo: (
+    id: string,
+    datos: Pick<ModeloEquipo, 'sistema' | 'denominacion' | 'fabricante'>
+  ) => void;
+  eliminarModelo: (id: string) => void;
+
   // Utilidades
-  restaurarDatosIniciales: () => void;
   getEquipoPorId: (id: string) => EquipoInstalado | undefined;
   getModeloPorId: (id: string) => ModeloEquipo | undefined;
   getAeropuertoPorCodigo: (codigo: string) => Aeropuerto | undefined;
   getTecnicoPorId: (id: string) => Tecnico | undefined;
 }
 
-const STORAGE_KEYS = {
-  AEROPUERTOS: 'maximo_radioayudas_aeropuertos_v1',
-  MODELOS: 'maximo_radioayudas_modelos_v1',
-  EQUIPOS: 'maximo_radioayudas_equipos_v1',
-  NOMINA: 'maximo_radioayudas_nomina_v1',
-  COMISIONES: 'maximo_radioayudas_comisiones_v1',
-  INTERVENCIONES: 'maximo_radioayudas_intervenciones_v1',
-  AUDITORIA: 'maximo_radioayudas_auditoria_v1',
-};
-
 // Usuario fijo de la sesión actual: el sistema todavía no tiene autenticación
 // multiusuario, por lo que toda acción auditada se atribuye a este usuario.
 const USUARIO_ACTUAL = 'Ing. Fran';
 
-const TIPOS_INTERVENCION_VALIDOS: TipoIntervencion[] = [
-  'Verificación',
-  'Preventivo',
-  'Correctivo',
-  'Otros',
-];
-
-/**
- * Migra comisiones guardadas en localStorage con el esquema anterior
- * (tipoMantenimiento: string + tipoMantenimientoPrevisto) al campo único
- * y estructurado tiposMantenimiento: TipoIntervencion[], para que datos
- * persistidos por una versión previa de la app no rompan la UI.
- */
-function migrarComisionLegacy(raw: any): ComisionServicio {
-  if (Array.isArray(raw.tiposMantenimiento) && raw.tiposMantenimiento.length > 0) {
-    return raw as ComisionServicio;
-  }
-  const { tipoMantenimiento, tipoMantenimientoPrevisto, ...resto } = raw;
-  const fuente: string = tipoMantenimiento || tipoMantenimientoPrevisto || '';
-  const tipos = fuente
-    .split(',')
-    .map((s: string) => s.trim())
-    .filter((s: string): s is TipoIntervencion =>
-      TIPOS_INTERVENCION_VALIDOS.includes(s as TipoIntervencion)
-    );
-  return {
-    ...resto,
-    tiposMantenimiento: tipos.length > 0 ? tipos : ['Otros'],
-  } as ComisionServicio;
-}
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Todos los aeropuertos, incluidos los dados de baja (baja lógica).
-  const [aeropuertosTodos, setAeropuertos] = useState<Aeropuerto[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.AEROPUERTOS);
-    return saved ? JSON.parse(saved) : INITIAL_AEROPUERTOS;
-  });
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [errorSync, setErrorSync] = useState<string | null>(null);
+  const limpiarErrorSync = () => setErrorSync(null);
+
+  // Persiste en segundo plano contra Supabase: la UI ya actualizó su estado
+  // local de forma optimista, esto solo confirma que quedó guardado. Si falla,
+  // se avisa con un banner en vez de fallar silenciosamente.
+  const sync = (promesa: Promise<unknown>, contexto: string) => {
+    promesa.catch((err) => {
+      console.error(`Error guardando "${contexto}" en la base de datos:`, err);
+      setErrorSync(
+        `No se pudo guardar "${contexto}" en el servidor (${
+          err instanceof Error ? err.message : 'error desconocido'
+        }). El cambio quedó solo en esta pantalla; recargar la página lo perdería.`
+      );
+    });
+  };
+
+  const [aeropuertosTodos, setAeropuertos] = useState<Aeropuerto[]>([]);
   const aeropuertos = useMemo(
     () => aeropuertosTodos.filter((a) => !a.eliminadoAt),
     [aeropuertosTodos]
   );
 
-  const [modelos, setModelos] = useState<ModeloEquipo[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.MODELOS);
-    return saved ? JSON.parse(saved) : INITIAL_MODELOS;
-  });
+  const [modelosTodos, setModelosTodos] = useState<ModeloEquipo[]>([]);
+  const modelos = useMemo(() => modelosTodos.filter((m) => !m.eliminadoAt), [modelosTodos]);
 
-  const [equipos, setEquipos] = useState<EquipoInstalado[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.EQUIPOS);
-    return saved ? JSON.parse(saved) : INITIAL_EQUIPOS;
-  });
+  const [equipos, setEquipos] = useState<EquipoInstalado[]>([]);
+  const [nomina, setNomina] = useState<Tecnico[]>([]);
 
-  const [nomina, setNomina] = useState<Tecnico[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.NOMINA);
-    const datos: Tecnico[] = saved ? JSON.parse(saved) : INITIAL_NOMINA;
-    // Registros anteriores al campo "laboratorio": se asumen del Laboratorio.
-    return datos.map((t) => ({ ...t, laboratorio: t.laboratorio !== false }));
-  });
-
-  // Todas las comisiones, incluidas las eliminadas (baja lógica).
-  const [comisionesTodas, setComisiones] = useState<ComisionServicio[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.COMISIONES);
-    const datos = saved ? JSON.parse(saved) : INITIAL_COMISIONES;
-    return datos.map(migrarComisionLegacy);
-  });
-
-  // Una comisión eliminada no aparece en ninguna pantalla operativa, pero su
-  // registro se conserva (y su código queda reservado) para el historial.
+  const [comisionesTodas, setComisiones] = useState<ComisionServicio[]>([]);
   const comisiones = useMemo(
     () => comisionesTodas.filter((c) => !c.eliminadaAt),
     [comisionesTodas]
@@ -177,44 +137,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [comisionesTodas]
   );
 
-  const [intervenciones, setIntervenciones] = useState<IntervencionMantenimiento[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.INTERVENCIONES);
-    return saved ? JSON.parse(saved) : INITIAL_INTERVENCIONES;
-  });
+  const [intervenciones, setIntervenciones] = useState<IntervencionMantenimiento[]>([]);
+  const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>([]);
 
-  const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.AUDITORIA);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Guardar en localStorage ante cambios
+  // Carga inicial: todo viene de Supabase (radioayudas-dev), no de localStorage.
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AEROPUERTOS, JSON.stringify(aeropuertosTodos));
-  }, [aeropuertosTodos]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MODELOS, JSON.stringify(modelos));
-  }, [modelos]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.EQUIPOS, JSON.stringify(equipos));
-  }, [equipos]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOMINA, JSON.stringify(nomina));
-  }, [nomina]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.COMISIONES, JSON.stringify(comisionesTodas));
-  }, [comisionesTodas]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.INTERVENCIONES, JSON.stringify(intervenciones));
-  }, [intervenciones]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AUDITORIA, JSON.stringify(auditoria));
-  }, [auditoria]);
+    let cancelado = false;
+    Promise.all([
+      repo.fetchAeropuertos(),
+      repo.fetchModelos(),
+      repo.fetchEquipos(),
+      repo.fetchTecnicos(),
+      repo.fetchComisiones(),
+      repo.fetchIntervenciones(),
+      repo.fetchAuditoria(),
+    ])
+      .then(([aero, mod, eq, tec, com, interv, audit]) => {
+        if (cancelado) return;
+        setAeropuertos(aero);
+        setModelosTodos(mod);
+        setEquipos(eq);
+        setNomina(tec);
+        setComisiones(com);
+        setIntervenciones(interv);
+        setAuditoria(audit);
+      })
+      .catch((err) => {
+        if (cancelado) return;
+        setErrorCarga(
+          err instanceof Error ? err.message : 'No se pudo conectar con la base de datos.'
+        );
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Registra un evento de auditoría genérico (por ahora solo se invoca desde
   // el módulo de Comisiones, pero el mecanismo es reutilizable por cualquier
@@ -238,12 +198,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       estadoNuevo,
     };
     setAuditoria((prev) => [registro, ...prev]);
+    sync(repo.insertarAuditoriaDB(registro), `auditoría de ${entidadEtiqueta}`);
   };
 
   // Regla de Negocio:
   // Toda comisión en estado de 'Planificada' pasa a estar 'En Curso' cuando la fecha está dentro del rango de fechas de la comisión.
   // Una vez finalizada no vuelve a cambiar.
   useEffect(() => {
+    if (cargando) return;
     const hoyStr = getHoyLocalStr();
     setComisiones((prev) => {
       let cambio = false;
@@ -252,14 +214,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const evaluado = evaluarEstadoComisionSegunFecha(com, hoyStr);
           if (evaluado !== com.estado) {
             cambio = true;
-            return { ...com, estado: evaluado };
+            const actualizada = { ...com, estado: evaluado };
+            sync(repo.actualizarComisionDB(actualizada), `estado de ${com.codigo}`);
+            return actualizada;
           }
         }
         return com;
       });
       return cambio ? actualizadas : prev;
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando]);
 
   const getEquipoPorId = (id: string) => equipos.find((e) => e.id === id);
   const getModeloPorId = (id: string) => modelos.find((m) => m.id === id);
@@ -353,6 +318,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setComisiones((prev) => [nuevaComision, ...prev]);
+    sync(repo.insertarComisionDB(nuevaComision), `la comisión ${codigo}`);
     registrarAuditoria('CREAR', id, codigo, null, nuevaComision as unknown as Record<string, unknown>);
     return nuevaComision;
   };
@@ -372,6 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComisiones((prev) =>
       prev.map((c) => (c.id === objetoFinal.id ? objetoFinal : c))
     );
+    sync(repo.actualizarComisionDB(objetoFinal), `la comisión ${objetoFinal.codigo}`);
     registrarAuditoria(
       'EDITAR',
       objetoFinal.id,
@@ -402,6 +369,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComisiones((prev) =>
       prev.map((c) => (c.id === comisionId ? comisionCancelada : c))
     );
+    sync(repo.actualizarComisionDB(comisionCancelada), `la cancelación de ${comision.codigo}`);
     registrarAuditoria(
       'CANCELAR',
       comision.id,
@@ -422,9 +390,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
     }
     // Baja lógica: la comisión deja de listarse pero el registro se conserva.
+    const comisionEliminada = { ...comision, eliminadaAt: new Date().toISOString() };
     setComisiones((prev) =>
-      prev.map((c) => (c.id === comisionId ? { ...c, eliminadaAt: new Date().toISOString() } : c))
+      prev.map((c) => (c.id === comisionId ? comisionEliminada : c))
     );
+    sync(repo.actualizarComisionDB(comisionEliminada), `la eliminación de ${comision.codigo}`);
     registrarAuditoria(
       'ELIMINAR',
       comision.id,
@@ -490,6 +460,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 3. Actualizar equipos según las tareas realizadas
     // Cada intervención registrada actualiza las fechas de último mantenimiento del equipo intervenido
+    let equiposParaSincronizar: EquipoInstalado[] = [];
     setEquipos((prevEquipos) => {
       let actualizados = [...prevEquipos];
       const equiposConIntervencionExplicita = new Set(
@@ -545,12 +516,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       });
 
+      // Solo hace falta persistir los equipos que efectivamente cambiaron
+      // (los intervenidos y sus asociados sincronizados).
+      equiposParaSincronizar = actualizados.filter((eq, i) => eq !== prevEquipos[i]);
       return actualizados;
     });
+    if (equiposParaSincronizar.length > 0) {
+      sync(
+        repo.actualizarEquiposMasivoDB(equiposParaSincronizar),
+        `los equipos intervenidos en ${comisionActual.codigo}`
+      );
+    }
 
     // 4. Agregar intervenciones al estado
     if (nuevasIntervenciones.length > 0) {
       setIntervenciones((prev) => [...prev, ...nuevasIntervenciones]);
+      sync(
+        repo.insertarIntervencionesDB(nuevasIntervenciones),
+        `las tareas realizadas en ${comisionActual.codigo}`
+      );
     }
 
     // 5. Marcar comisión como Finalizada, guardar fechas reales, destinos visitados y reemplazar el/los tipo(s) de mantenimiento previstos por todos los realmente realizados
@@ -574,6 +558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setComisiones((prev) =>
       prev.map((com) => (com.id === datosCierre.comisionId ? comisionFinalizada : com))
     );
+    sync(repo.actualizarComisionDB(comisionFinalizada), `el cierre de ${comisionActual.codigo}`);
     registrarAuditoria(
       'CERRAR',
       comisionActual.id,
@@ -591,10 +576,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return [...prev, equipo];
     });
+    sync(repo.guardarEquipoDB(equipo), `la radioayuda ${equipo.identificador}`);
   };
 
   const eliminarEquipo = (equipoId: string) => {
     setEquipos((prev) => prev.filter((e) => e.id !== equipoId));
+    sync(repo.eliminarEquipoDB(equipoId), 'la eliminación de la radioayuda');
   };
 
   const guardarTecnico = (tecnico: Tecnico) => {
@@ -605,6 +592,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return [...prev, tecnico];
     });
+    sync(repo.guardarTecnicoDB(tecnico), `el técnico ${tecnico.apellido}, ${tecnico.nombre}`);
   };
 
   // Baja lógica: el técnico deja de listarse y de poder designarse, pero las
@@ -619,9 +607,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (activas > 0) {
       throw new Error(`No se puede dar de baja: está designado en ${activas} comisión(es) sin finalizar.`);
     }
-    setNomina((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, bajaAt: new Date().toISOString() } : t))
-    );
+    const bajaAt = new Date().toISOString();
+    setNomina((prev) => prev.map((t) => (t.id === id ? { ...t, bajaAt } : t)));
+    sync(repo.darDeBajaTecnicoDB(id, bajaAt), 'la baja del técnico');
   };
 
   const crearAeropuerto = (datos: Pick<Aeropuerto, 'codigoIATA' | 'nombreOficial' | 'region'>) => {
@@ -637,10 +625,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (aeropuertosTodos.some((a) => a.codigoIATA.toUpperCase() === codigo)) {
       throw new Error(`El código ${codigo} ya está registrado.`);
     }
-    setAeropuertos((prev) => [
-      ...prev,
-      { codigoIATA: codigo, nombreOficial: nombre, region: datos.region },
-    ]);
+    const nuevo: Aeropuerto = { codigoIATA: codigo, nombreOficial: nombre, region: datos.region };
+    setAeropuertos((prev) => [...prev, nuevo]);
+    sync(repo.insertarAeropuerto(nuevo), `el aeropuerto ${codigo}`);
   };
 
   // El código IATA no se puede modificar: es la clave con la que lo referencian
@@ -660,6 +647,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((a) =>
         a.codigoIATA === codigoIATA ? { ...a, nombreOficial: nombre, region: datos.region } : a
       )
+    );
+    sync(
+      repo.actualizarAeropuertoDB(codigoIATA, { nombreOficial: nombre, region: datos.region }),
+      `el aeropuerto ${codigoIATA}`
     );
   };
 
@@ -683,40 +674,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `No se puede eliminar ${codigoIATA}: figura en ${cantComisiones} comisión(es).`
       );
     }
+    const eliminadoAt = new Date().toISOString();
     setAeropuertos((prev) =>
-      prev.map((a) =>
-        a.codigoIATA === codigoIATA ? { ...a, eliminadoAt: new Date().toISOString() } : a
+      prev.map((a) => (a.codigoIATA === codigoIATA ? { ...a, eliminadoAt } : a))
+    );
+    sync(repo.darDeBajaAeropuertoDB(codigoIATA, eliminadoAt), `la baja de ${codigoIATA}`);
+  };
+
+  const crearModelo = (
+    datos: Pick<ModeloEquipo, 'sistema' | 'denominacion' | 'fabricante'>
+  ) => {
+    const denominacion = datos.denominacion.trim();
+    const fabricante = datos.fabricante.trim();
+    if (!denominacion) {
+      throw new Error('La denominación del modelo es obligatoria.');
+    }
+    // Se compara contra todos (incluidos los dados de baja) para no duplicar.
+    if (
+      modelosTodos.some(
+        (m) =>
+          !m.eliminadoAt &&
+          m.sistema === datos.sistema &&
+          m.denominacion.toLowerCase() === denominacion.toLowerCase()
       )
+    ) {
+      throw new Error(`Ya existe un modelo ${datos.sistema} con esa denominación.`);
+    }
+    const nuevo: ModeloEquipo = { id: generarId('MOD'), sistema: datos.sistema, denominacion, fabricante };
+    setModelosTodos((prev) => [...prev, nuevo]);
+    sync(repo.insertarModelo(nuevo), `el modelo ${denominacion}`);
+  };
+
+  const actualizarModelo = (
+    id: string,
+    datos: Pick<ModeloEquipo, 'sistema' | 'denominacion' | 'fabricante'>
+  ) => {
+    if (!modelos.some((m) => m.id === id)) {
+      throw new Error('El modelo indicado no existe.');
+    }
+    const denominacion = datos.denominacion.trim();
+    const fabricante = datos.fabricante.trim();
+    if (!denominacion) {
+      throw new Error('La denominación del modelo es obligatoria.');
+    }
+    setModelosTodos((prev) =>
+      prev.map((m) =>
+        m.id === id ? { ...m, sistema: datos.sistema, denominacion, fabricante } : m
+      )
+    );
+    sync(
+      repo.actualizarModeloDB(id, { sistema: datos.sistema, denominacion, fabricante }),
+      `el modelo ${denominacion}`
     );
   };
 
-  const restaurarDatosIniciales = () => {
-    if (
-      window.confirm(
-        '¿Desea restablecer todos los datos iniciales de prueba? Se reiniciarán aeropuertos, equipos, nómina y comisiones a sus valores predeterminados.'
-      )
-    ) {
-      localStorage.removeItem(STORAGE_KEYS.AEROPUERTOS);
-      localStorage.removeItem(STORAGE_KEYS.MODELOS);
-      localStorage.removeItem(STORAGE_KEYS.EQUIPOS);
-      localStorage.removeItem(STORAGE_KEYS.NOMINA);
-      localStorage.removeItem(STORAGE_KEYS.COMISIONES);
-      localStorage.removeItem(STORAGE_KEYS.INTERVENCIONES);
-      localStorage.removeItem(STORAGE_KEYS.AUDITORIA);
-
-      setAeropuertos(INITIAL_AEROPUERTOS);
-      setModelos(INITIAL_MODELOS);
-      setEquipos(INITIAL_EQUIPOS);
-      setNomina(INITIAL_NOMINA);
-      setComisiones(INITIAL_COMISIONES);
-      setIntervenciones(INITIAL_INTERVENCIONES);
-      setAuditoria([]);
+  // Baja lógica. Se bloquea si el modelo todavía tiene equipos instalados que lo referencian.
+  const eliminarModelo = (id: string) => {
+    if (!modelos.some((m) => m.id === id)) {
+      throw new Error('El modelo indicado no existe.');
     }
+    const cantEquipos = equipos.filter((e) => e.modeloId === id).length;
+    if (cantEquipos > 0) {
+      throw new Error(
+        `No se puede eliminar: tiene ${cantEquipos} radioayuda(s) instalada(s) con este modelo.`
+      );
+    }
+    const eliminadoAt = new Date().toISOString();
+    setModelosTodos((prev) => prev.map((m) => (m.id === id ? { ...m, eliminadoAt } : m)));
+    sync(repo.darDeBajaModeloDB(id, eliminadoAt), 'la baja del modelo');
   };
 
   return (
     <AppContext.Provider
       value={{
+        cargando,
+        errorCarga,
+        errorSync,
+        limpiarErrorSync,
         aeropuertos,
         modelos,
         equipos,
@@ -737,7 +771,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         crearAeropuerto,
         actualizarAeropuerto,
         eliminarAeropuerto,
-        restaurarDatosIniciales,
+        crearModelo,
+        actualizarModelo,
+        eliminarModelo,
         getEquipoPorId,
         getModeloPorId,
         getAeropuertoPorCodigo,

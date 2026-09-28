@@ -362,6 +362,7 @@ export const LogsComisionesView: React.FC = () => {
                         {new Date(registro.fecha).toLocaleTimeString('es-AR', {
                           hour: '2-digit',
                           minute: '2-digit',
+                          hour12: false,
                         })}
                       </td>
                       <td className="py-3 px-3.5 border-r border-[#e0e0e0] text-sm text-[#161616] font-mono align-top whitespace-nowrap">
@@ -379,19 +380,22 @@ export const LogsComisionesView: React.FC = () => {
                         {observacion}
                       </td>
                       <td className="py-3 px-3.5 align-top text-center">
-                        {tieneDetalle && (
-                          <button
-                            onClick={() => setExpandidoId(expandido ? null : registro.id)}
-                            title="Ver detalle campo por campo"
-                            className="p-1.5 text-[#525252] hover:bg-[#e0e0e0] transition-colors cursor-pointer"
-                          >
-                            {expandido ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => tieneDetalle && setExpandidoId(expandido ? null : registro.id)}
+                          disabled={!tieneDetalle}
+                          title={tieneDetalle ? 'Ver detalle campo por campo' : 'Sin detalle de campos'}
+                          className={
+                            tieneDetalle
+                              ? 'p-1.5 text-[#525252] hover:bg-[#e0e0e0] transition-colors cursor-pointer'
+                              : 'p-1.5 text-[#c6c6c6] cursor-not-allowed'
+                          }
+                        >
+                          {expandido ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
                       </td>
                     </tr>
 

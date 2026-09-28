@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Radio, Plane, ShieldCheck, Layers, History, ChevronDown } from 'lucide-react';
+import { Radio, Plane, ShieldCheck, Layers, History, ChevronDown, Cpu } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export type VistaActiva =
@@ -7,7 +7,8 @@ export type VistaActiva =
   | 'comisiones-logs'
   | 'radioayudas'
   | 'nomina'
-  | 'aeropuertos';
+  | 'aeropuertos'
+  | 'modelos';
 
 interface HeaderProps {
   vistaActiva: VistaActiva;
@@ -113,6 +114,18 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
             >
               <Layers className="w-4.5 h-4.5 text-[#ff7eb6]" />
               <span>Aeropuertos</span>
+            </button>
+
+            <button
+              onClick={() => setVistaActiva('modelos')}
+              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                vistaActiva === 'modelos'
+                  ? 'border-[#0f62fe] bg-[#393939] text-white'
+                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+              }`}
+            >
+              <Cpu className="w-4.5 h-4.5 text-[#be95ff]" />
+              <span>Modelos</span>
             </button>
 
             <button
