@@ -15,12 +15,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import {
-  EquipoInstalado,
-  SistemaRadioayuda,
-  RegionAeronautica,
-  NivelSemaforo,
-} from '../types';
+import { EquipoInstalado, SistemaRadioayuda, RegionAeronautica } from '../types';
 import {
   calcularEstadoVencimiento,
   getClasesSemaforo,
@@ -37,40 +32,7 @@ export const RadioayudasView: React.FC = () => {
   // Filtros
   const [filtroSistema, setFiltroSistema] = useState<'TODOS' | SistemaRadioayuda>('TODOS');
   const [filtroRegion, setFiltroRegion] = useState<'TODAS' | RegionAeronautica>('TODAS');
-  const [filtroSemaforo, setFiltroSemaforo] = useState<'TODOS' | 'VENCIDO' | 'PROXIMO_A_VENCER' | 'AL_DIA'>('TODOS');
   const [busqueda, setBusqueda] = useState('');
-
-  // Estadísticas globales de semáforos
-  const resumenSemaforos = useMemo(() => {
-    let vencidos = 0;
-    let proximos = 0;
-    let alDia = 0;
-
-    equipos.forEach((eq) => {
-      const vAerea = calcularEstadoVencimiento(
-        eq.fechaUltimaVerificacionAerea,
-        eq.frecuenciaVerificacionAereaMeses
-      );
-      const mPrev = calcularEstadoVencimiento(
-        eq.fechaUltimoMantenimientoPreventivo,
-        eq.frecuenciaMantenimientoPreventivoMeses
-      );
-
-      // Si cualquiera de los dos está vencido, cuenta como vencido en el equipo
-      if (vAerea.nivel === 'VENCIDO' || mPrev.nivel === 'VENCIDO') {
-        vencidos++;
-      } else if (
-        vAerea.nivel === 'PROXIMO_A_VENCER' ||
-        mPrev.nivel === 'PROXIMO_A_VENCER'
-      ) {
-        proximos++;
-      } else {
-        alDia++;
-      }
-    });
-
-    return { total: equipos.length, vencidos, proximos, alDia };
-  }, [equipos]);
 
   // Lista filtrada de equipos con cálculo de semáforos
   const equiposConCalculo = useMemo(() => {
@@ -92,20 +54,6 @@ export const RadioayudasView: React.FC = () => {
           eq.frecuenciaMantenimientoPreventivoMeses
         );
 
-        // Nivel crítico general del equipo
-        let nivelCritico: NivelSemaforo = 'AL_DIA';
-        if (
-          estadoVerificacionAerea.nivel === 'VENCIDO' ||
-          estadoPreventivo.nivel === 'VENCIDO'
-        ) {
-          nivelCritico = 'VENCIDO';
-        } else if (
-          estadoVerificacionAerea.nivel === 'PROXIMO_A_VENCER' ||
-          estadoPreventivo.nivel === 'PROXIMO_A_VENCER'
-        ) {
-          nivelCritico = 'PROXIMO_A_VENCER';
-        }
-
         return {
           ...eq,
           modelo,
@@ -113,7 +61,6 @@ export const RadioayudasView: React.FC = () => {
           equipoAsociado,
           estadoVerificacionAerea,
           estadoPreventivo,
-          nivelCritico,
         };
       })
       .filter((item) => {
@@ -121,9 +68,6 @@ export const RadioayudasView: React.FC = () => {
           filtroSistema === 'TODOS' || item.modelo?.sistema === filtroSistema;
         const coincideRegion =
           filtroRegion === 'TODAS' || item.aeropuerto?.region === filtroRegion;
-        const coincideSemaforo =
-          filtroSemaforo === 'TODOS' || item.nivelCritico === filtroSemaforo;
-
         const busqLower = busqueda.toLowerCase();
         const coincideBusqueda =
           item.identificador.toLowerCase().includes(busqLower) ||
@@ -131,11 +75,9 @@ export const RadioayudasView: React.FC = () => {
           (item.aeropuerto?.nombreOficial || '').toLowerCase().includes(busqLower) ||
           (item.modelo?.denominacion || '').toLowerCase().includes(busqLower);
 
-        return (
-          coincideSistema && coincideRegion && coincideSemaforo && coincideBusqueda
-        );
+        return coincideSistema && coincideRegion && coincideBusqueda;
       });
-  }, [equipos, modelos, aeropuertos, filtroSistema, filtroRegion, filtroSemaforo, busqueda]);
+  }, [equipos, modelos, aeropuertos, filtroSistema, filtroRegion, busqueda]);
 
   const abrirNuevoEquipo = () => {
     setEquipoSeleccionado(null);
@@ -172,80 +114,6 @@ export const RadioayudasView: React.FC = () => {
         >
           <Plus className="w-4 h-4" />
           <span>ALTA DE RADIOAYUDA</span>
-        </button>
-      </div>
-
-      {/* Tarjetas de Semáforo General */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <button
-          onClick={() => setFiltroSemaforo('TODOS')}
-          className={`p-3 text-left border transition-all ${
-            filtroSemaforo === 'TODOS'
-              ? 'bg-white border-[#0f62fe] shadow-xs ring-1 ring-[#0f62fe]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-[10px] uppercase font-bold text-[#6f6f6f] tracking-wider">
-            Total Radioayudas
-          </div>
-          <div className="text-2xl font-bold font-mono text-[#161616] mt-0.5">
-            {resumenSemaforos.total}
-          </div>
-          <div className="text-[11px] text-[#525252] mt-1">Activos monitoreados</div>
-        </button>
-
-        <button
-          onClick={() => setFiltroSemaforo('AL_DIA')}
-          className={`p-3 text-left border transition-all ${
-            filtroSemaforo === 'AL_DIA'
-              ? 'bg-white border-[#198038] shadow-xs ring-1 ring-[#198038]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-[10px] uppercase font-bold text-[#0e6027] tracking-wider flex items-center justify-between">
-            <span>Al Día (&gt; 30 días)</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#198038]"></span>
-          </div>
-          <div className="text-2xl font-bold font-mono text-[#0e6027] mt-0.5">
-            {resumenSemaforos.alDia}
-          </div>
-          <div className="text-[11px] text-[#0e6027] mt-1">Mantenimientos vigentes</div>
-        </button>
-
-        <button
-          onClick={() => setFiltroSemaforo('PROXIMO_A_VENCER')}
-          className={`p-3 text-left border transition-all ${
-            filtroSemaforo === 'PROXIMO_A_VENCER'
-              ? 'bg-white border-[#f1c21b] shadow-xs ring-1 ring-[#f1c21b]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-[10px] uppercase font-bold text-[#8a6100] tracking-wider flex items-center justify-between">
-            <span>Próximo a Vencer (≤ 30d)</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#f1c21b]"></span>
-          </div>
-          <div className="text-2xl font-bold font-mono text-[#8a6100] mt-0.5">
-            {resumenSemaforos.proximos}
-          </div>
-          <div className="text-[11px] text-[#8a6100] mt-1">Coordinar comisión urgente</div>
-        </button>
-
-        <button
-          onClick={() => setFiltroSemaforo('VENCIDO')}
-          className={`p-3 text-left border transition-all ${
-            filtroSemaforo === 'VENCIDO'
-              ? 'bg-white border-[#da1e28] shadow-xs ring-1 ring-[#da1e28]'
-              : 'bg-white border-[#e0e0e0] hover:border-[#8d8d8d]'
-          }`}
-        >
-          <div className="text-[10px] uppercase font-bold text-[#da1e28] tracking-wider flex items-center justify-between">
-            <span>Vencidos (&lt; 0 días)</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#da1e28] animate-ping"></span>
-          </div>
-          <div className="text-2xl font-bold font-mono text-[#da1e28] mt-0.5">
-            {resumenSemaforos.vencidos}
-          </div>
-          <div className="text-[11px] text-[#da1e28] mt-1">Periodicidad superada</div>
         </button>
       </div>
 

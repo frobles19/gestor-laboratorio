@@ -6,7 +6,7 @@ import { JERARQUIA_VALOR, getClasesEstadoComision } from '../utils/maintenance';
 import { TecnicoExpedienteModal } from './TecnicoExpedienteModal';
 
 type EstadoTecnico = 'Laboratorio' | 'Comisión' | 'Licencia';
-type Alcance = 'LABORATORIO' | 'TODOS';
+type Alcance = 'LABORATORIO' | 'OTROS';
 
 const PUESTOS: PuestoTecnico[] = [
   'Jefe Departamento',
@@ -14,6 +14,7 @@ const PUESTOS: PuestoTecnico[] = [
   'Coordinador',
   'Coordinador Adjunto',
   'Técnico',
+  'Instructor',
 ];
 
 // Mismos colores que el resto de la app: verde = disponible, azul = en curso, amarillo = pendiente.
@@ -31,7 +32,14 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
   const { nomina, comisiones, guardarTecnico, darDeBajaTecnico } = useApp();
 
   const [busqueda, setBusqueda] = useState('');
-  const [alcance, setAlcance] = useState<Alcance>('LABORATORIO');
+  // Multi-selección: por defecto solo se ve el personal del Laboratorio; activar
+  // "Otros" suma también al personal externo, sin excluir al del Laboratorio.
+  const [alcances, setAlcances] = useState<Alcance[]>(['LABORATORIO']);
+  const toggleAlcance = (valor: Alcance) => {
+    setAlcances((prev) =>
+      prev.includes(valor) ? prev.filter((a) => a !== valor) : [...prev, valor]
+    );
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [tecnicoEdit, setTecnicoEdit] = useState<Tecnico | null>(null);
@@ -116,8 +124,13 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
 
   const vigentes = useMemo(() => nomina.filter((t) => !t.bajaAt), [nomina]);
   const enAlcance = useMemo(
-    () => (alcance === 'LABORATORIO' ? vigentes.filter((t) => t.laboratorio) : vigentes),
-    [vigentes, alcance]
+    () =>
+      vigentes.filter(
+        (t) =>
+          (alcances.includes('LABORATORIO') && t.laboratorio) ||
+          (alcances.includes('OTROS') && !t.laboratorio)
+      ),
+    [vigentes, alcances]
   );
 
   // Orden por jerarquía institucional y luego por apellido
@@ -141,10 +154,11 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
       });
   }, [enAlcance, busqueda]);
 
-  const hayFiltrosActivos = busqueda.trim() !== '' || alcance !== 'LABORATORIO';
+  const hayFiltrosActivos =
+    busqueda.trim() !== '' || alcances.length !== 1 || alcances[0] !== 'LABORATORIO';
   const limpiarFiltros = () => {
     setBusqueda('');
-    setAlcance('LABORATORIO');
+    setAlcances(['LABORATORIO']);
   };
 
   return (
@@ -194,14 +208,14 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
           {(
             [
               { valor: 'LABORATORIO', etiqueta: 'Laboratorio' },
-              { valor: 'TODOS', etiqueta: 'Todos' },
+              { valor: 'OTROS', etiqueta: 'Otros' },
             ] as const
           ).map(({ valor, etiqueta }) => (
             <button
               key={valor}
-              onClick={() => setAlcance(valor)}
+              onClick={() => toggleAlcance(valor)}
               className={`px-3 py-1 text-xs font-bold border transition-colors whitespace-nowrap cursor-pointer ${
-                alcance === valor
+                alcances.includes(valor)
                   ? 'bg-[#161616] text-white border-[#161616]'
                   : 'bg-[#f4f4f4] text-[#161616] border-[#e0e0e0] hover:bg-[#e0e0e0]'
               }`}
@@ -374,9 +388,7 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase mb-1">
-                  Puesto (determina el nivel de mando) *
-                </label>
+                <label className="block text-xs font-semibold uppercase mb-1">Puesto *</label>
                 <select
                   value={puesto}
                   onChange={(e) => setPuesto(e.target.value as PuestoTecnico)}
@@ -384,7 +396,7 @@ export const TecnicosView: React.FC<TecnicosViewProps> = ({ onVerComisiones }) =
                 >
                   {PUESTOS.map((p) => (
                     <option key={p} value={p}>
-                      {p} (Nivel {JERARQUIA_VALOR[p]})
+                      {p}
                     </option>
                   ))}
                 </select>

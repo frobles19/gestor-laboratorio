@@ -7,269 +7,367 @@ import {
   IntervencionMantenimiento,
 } from './types';
 
-export const INITIAL_AEROPUERTOS: Aeropuerto[] = [
-  {
-    codigoIATA: 'EZE',
-    nombreOficial: 'Aeropuerto Internacional Ministro Pistarini',
-    region: 'EZEIZA',
-  },
+﻿export const INITIAL_AEROPUERTOS: Aeropuerto[] = [
   {
     codigoIATA: 'AEP',
-    nombreOficial: 'Aeroparque Jorge Newbery',
+    nombreOficial: 'AEROPARQUE',
     region: 'EZEIZA',
   },
   {
-    codigoIATA: 'COR',
-    nombreOficial: 'Aeropuerto Internacional Ing. Ambrosio Taravella',
-    region: 'CORDOBA',
-  },
-  {
-    codigoIATA: 'MDZ',
-    nombreOficial: 'Aeropuerto Internacional Gobernador Francisco Gabrielli',
-    region: 'MENDOZA',
-  },
-  {
-    codigoIATA: 'IGR',
-    nombreOficial: 'Aeropuerto Internacional Mayor D. Carlos Eduardo Krause',
-    region: 'RESISTENCIA',
-  },
-  {
-    codigoIATA: 'RES',
-    nombreOficial: 'Aeropuerto Internacional de Resistencia',
-    region: 'RESISTENCIA',
-  },
-  {
-    codigoIATA: 'CRD',
-    nombreOficial: 'Aeropuerto Internacional General Enrique Mosconi',
-    region: 'COMODORO RIVADAVIA',
+    codigoIATA: 'BCA',
+    nombreOficial: 'BAHIA BLANCA',
+    region: 'EZEIZA',
   },
   {
     codigoIATA: 'BRC',
-    nombreOficial: 'Aeropuerto Internacional Teniente Luis Candelaria',
-    region: 'COMODORO RIVADAVIA',
+    nombreOficial: 'BARILOCHE',
+    region: 'EZEIZA',
   },
   {
-    codigoIATA: 'SLA',
-    nombreOficial: 'Aeropuerto Internacional Martín Miguel de Güemes',
+    codigoIATA: 'CHP',
+    nombreOficial: 'CHAPELCO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'OEL',
+    nombreOficial: 'CHOELE CHOEL',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'GBE',
+    nombreOficial: 'GENERAL BELGRANO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'GPI',
+    nombreOficial: 'GENERAL PICO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'GUA',
+    nombreOficial: 'GUALEGUAYCHU',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'NIN',
+    nombreOficial: 'JUNIN',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'PTA',
+    nombreOficial: 'LA PLATA',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'LYE',
+    nombreOficial: 'LABOULAYE',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'PDI',
+    nombreOficial: 'PUNTA INDIO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'MDP',
+    nombreOficial: 'MAR DEL PLATA',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'NEU',
+    nombreOficial: 'NEUQUEN',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'PAL',
+    nombreOficial: 'PALOMAR',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'PAR',
+    nombreOficial: 'PARANA',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'ROS',
+    nombreOficial: 'ROSARIO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'SNT',
+    nombreOficial: 'SAN ANTONIO DE ARECO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'FDO',
+    nombreOficial: 'SAN FERNANDO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'OSA',
+    nombreOficial: 'SANTA ROSA',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'SVO',
+    nombreOficial: 'SAUCE VIEJO',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'DIL',
+    nombreOficial: 'TANDIL',
+    region: 'EZEIZA',
+  },
+  {
+    codigoIATA: 'CAT',
+    nombreOficial: 'CATAMARCA',
     region: 'CORDOBA',
   },
   {
-    codigoIATA: 'USH',
-    nombreOficial: 'Aeropuerto Internacional Malvinas Argentinas',
+    codigoIATA: 'ERE',
+    nombreOficial: 'CERES',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'CBA',
+    nombreOficial: 'CORDOBA',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'SRC',
+    nombreOficial: 'SANTA ROSA DE CONLARA',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'JUJ',
+    nombreOficial: 'JUJUY',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'LAR',
+    nombreOficial: 'LA RIOJA',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'MJZ',
+    nombreOficial: 'MARCO JUAREZ',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'RCU',
+    nombreOficial: 'RIO CUARTO',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'SAL',
+    nombreOficial: 'SALTA',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'SDE',
+    nombreOficial: 'SANTIAGO DEL ESTERO',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'TRH',
+    nombreOficial: 'TERMAS DE RIO HONDO',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'TUC',
+    nombreOficial: 'TUCUMAN',
+    region: 'CORDOBA',
+  },
+  {
+    codigoIATA: 'TRE',
+    nombreOficial: 'TRELEW',
     region: 'COMODORO RIVADAVIA',
   },
+  {
+    codigoIATA: 'USU',
+    nombreOficial: 'USHUAIA',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'SJU',
+    nombreOficial: 'SAN JULIAN',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'ECA',
+    nombreOficial: 'EL CALAFATE',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'VIE',
+    nombreOficial: 'VIEDMA',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'DYN',
+    nombreOficial: 'PUERTO MADRYN',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'GAL',
+    nombreOficial: 'RIO GALLEGOS',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'GRA',
+    nombreOficial: 'RIO GRANDE',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'ESQ',
+    nombreOficial: 'ESQUEL',
+    region: 'COMODORO RIVADAVIA',
+  },
+  {
+    codigoIATA: 'RYD',
+    nombreOficial: 'VILLA REYNOLDS',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'DOZ',
+    nombreOficial: 'MENDOZA',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'JUA',
+    nombreOficial: 'SAN JUAN',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'MLG',
+    nombreOficial: 'MALARGUE',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'SRA',
+    nombreOficial: 'SAN RAFAEL',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'UIS',
+    nombreOficial: 'SAN LUIS',
+    region: 'MENDOZA',
+  },
+  {
+    codigoIATA: 'RTA',
+    nombreOficial: 'RECONQUISTA',
+    region: 'RESISTENCIA',
+  },
+  {
+    codigoIATA: 'SIS',
+    nombreOficial: 'RESISTENCIA',
+    region: 'RESISTENCIA',
+  },
+  {
+    codigoIATA: 'FSA',
+    nombreOficial: 'FORMOSA',
+    region: 'RESISTENCIA',
+  },
+  {
+    codigoIATA: 'IGU',
+    nombreOficial: 'IGUAZU',
+    region: 'RESISTENCIA',
+  },
+  {
+    codigoIATA: 'POS',
+    nombreOficial: 'POSADAS',
+    region: 'RESISTENCIA',
+  },
 ];
 
+// Catálogo real de modelos de equipos, releído del backup de repuestos del
+// Laboratorio (backup_completo_radioayudas). Denominación = número/nombre de
+// modelo, fabricante = marca corta (edición del usuario desde la app), de
+// modo que "fabricante + denominación" se lea como un solo texto (ej: "Selex
+// 1118A"). Para ILS el modelo NO distingue entre Glide Path y Localizer: esa
+// distinción se hace a nivel del equipo instalado, no del modelo (pendiente,
+// todavía no cargamos equipos instalados reales).
 export const INITIAL_MODELOS: ModeloEquipo[] = [
+  // VOR
   {
-    id: 'MOD-DVOR-432',
+    id: 'MOD-VOR-SEL4000',
     sistema: 'VOR',
-    denominacion: 'Doppler VOR 432',
-    fabricante: 'Thales ATM',
+    denominacion: '4000',
+    fabricante: 'SEL',
   },
   {
-    id: 'MOD-DVOR-1150',
+    id: 'MOD-VOR-SELEX1150A',
     sistema: 'VOR',
-    denominacion: 'SELEX 1150 DVOR',
-    fabricante: 'Selex ES / Leonardo',
+    denominacion: '1150A',
+    fabricante: 'Selex',
   },
   {
-    id: 'MOD-DME-1118',
+    id: 'MOD-VOR-THALES431',
+    sistema: 'VOR',
+    denominacion: '431',
+    fabricante: 'Thales',
+  },
+  {
+    id: 'MOD-VOR-THALES432',
+    sistema: 'VOR',
+    denominacion: '432',
+    fabricante: 'Thales',
+  },
+  {
+    id: 'MOD-VOR-WILCOX585B',
+    sistema: 'VOR',
+    denominacion: '585B',
+    fabricante: 'Wilcox',
+  },
+  // DME
+  {
+    id: 'MOD-DME-THALES435',
     sistema: 'DME',
-    denominacion: 'DME 1118A High Power (1kW)',
-    fabricante: 'Fernau Avionics / Selex',
+    denominacion: '435',
+    fabricante: 'Thales',
   },
   {
-    id: 'MOD-DME-415',
+    id: 'MOD-DME-SELEX1118A',
     sistema: 'DME',
-    denominacion: 'Thales DME 415/435',
-    fabricante: 'Thales ATM',
+    denominacion: '1118A',
+    fabricante: 'Selex',
   },
   {
-    id: 'MOD-ILS-7000B',
-    sistema: 'ILS',
-    denominacion: 'NORMARC 7000B Cat II/III',
-    fabricante: 'Indra Sistemas / Normarc',
+    id: 'MOD-DME-PELORUS8900',
+    sistema: 'DME',
+    denominacion: '8900',
+    fabricante: 'Pelorus',
   },
   {
-    id: 'MOD-ILS-420',
+    id: 'MOD-DME-ALCATELFSD45',
+    sistema: 'DME',
+    denominacion: 'FSD-45',
+    fabricante: 'Alcatel',
+  },
+  {
+    id: 'MOD-DME-WILCOX596B',
+    sistema: 'DME',
+    denominacion: '596B',
+    fabricante: 'Wilcox',
+  },
+  // ILS
+  {
+    id: 'MOD-ILS-NORMARC3500',
     sistema: 'ILS',
-    denominacion: 'Thales ILS 420 (Dual TX)',
-    fabricante: 'Thales ATM',
+    denominacion: '3500',
+    fabricante: 'Normarc',
+  },
+  {
+    id: 'MOD-ILS-NORMARC7000',
+    sistema: 'ILS',
+    denominacion: '7000',
+    fabricante: 'Normarc',
   },
 ];
 
-export const INITIAL_EQUIPOS: EquipoInstalado[] = [
-  {
-    id: 'EQ-VOR-COR',
-    identificador: 'VOR CORDOBA',
-    aeropuertoCodigo: 'COR',
-    modeloId: 'MOD-DVOR-432',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-DME-COR',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-10-15', // Límite: 2026-10-15 (Próximo a vencer en sept 2026)
-    fechaUltimoMantenimientoPreventivo: '2026-07-10', // Límite: 2026-10-10
-    ubicacionDetalle: 'Sector Radiofaro Central 1.5 NM al Sur RWY 01',
-  },
-  {
-    id: 'EQ-DME-COR',
-    identificador: 'DME/VOR CORDOBA',
-    aeropuertoCodigo: 'COR',
-    modeloId: 'MOD-DME-1118',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-VOR-COR',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-10-15',
-    fechaUltimoMantenimientoPreventivo: '2026-07-10',
-    ubicacionDetalle: 'Caseta DVOR Córdoba',
-  },
-  {
-    id: 'EQ-VOR-EZE',
-    identificador: 'VOR EZEIZA',
-    aeropuertoCodigo: 'EZE',
-    modeloId: 'MOD-DVOR-1150',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-DME-EZE',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2026-08-12', // Al día
-    fechaUltimoMantenimientoPreventivo: '2026-08-12', // Al día
-    ubicacionDetalle: 'Emplazamiento VOR 2 NM al SW',
-  },
-  {
-    id: 'EQ-DME-EZE',
-    identificador: 'DME/VOR EZEIZA',
-    aeropuertoCodigo: 'EZE',
-    modeloId: 'MOD-DME-415',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-VOR-EZE',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2026-08-12',
-    fechaUltimoMantenimientoPreventivo: '2026-08-12',
-    ubicacionDetalle: 'Co-localizado VOR Ezeiza',
-  },
-  {
-    id: 'EQ-ILS-EZE-35R',
-    identificador: 'ILS 35R EZEIZA',
-    aeropuertoCodigo: 'EZE',
-    modeloId: 'MOD-ILS-7000B',
-    frecuenciaVerificacionAereaMeses: 6,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: null,
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2026-05-18', // Límite: 2026-11-18 (Al día)
-    fechaUltimoMantenimientoPreventivo: '2026-06-05', // Límite: 2026-09-05 (Vencido en sept 2026!)
-    ubicacionDetalle: 'Cabecera 35R (LOC en extremo 17L, GP en cabecera)',
-  },
-  {
-    id: 'EQ-VOR-IGR',
-    identificador: 'VOR IGUAZU',
-    aeropuertoCodigo: 'IGR',
-    modeloId: 'MOD-DVOR-432',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-DME-IGR',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-08-20', // Límite: 2026-08-20 (Vencido!)
-    fechaUltimoMantenimientoPreventivo: '2026-05-15', // Límite: 2026-08-15 (Vencido!)
-    ubicacionDetalle: 'Sector Noroeste Aeropuerto',
-  },
-  {
-    id: 'EQ-DME-IGR',
-    identificador: 'DME/VOR IGUAZU',
-    aeropuertoCodigo: 'IGR',
-    modeloId: 'MOD-DME-415',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-VOR-IGR',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-08-20',
-    fechaUltimoMantenimientoPreventivo: '2026-05-15',
-    ubicacionDetalle: 'Torre contraantena DVOR Iguazú',
-  },
-  {
-    id: 'EQ-VOR-MDZ',
-    identificador: 'VOR MENDOZA',
-    aeropuertoCodigo: 'MDZ',
-    modeloId: 'MOD-DVOR-1150',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-DME-MDZ',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-11-04', // Límite: 2026-11-04 (Al día ~44d)
-    fechaUltimoMantenimientoPreventivo: '2026-06-25', // Límite: 2026-09-25 (Próximo a vencer ~4d)
-    ubicacionDetalle: 'Área de Radiofaro Mendoza El Plumerillo',
-  },
-  {
-    id: 'EQ-DME-MDZ',
-    identificador: 'DME/VOR MENDOZA',
-    aeropuertoCodigo: 'MDZ',
-    modeloId: 'MOD-DME-1118',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-VOR-MDZ',
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-11-04',
-    fechaUltimoMantenimientoPreventivo: '2026-06-25',
-    ubicacionDetalle: 'Caseta DVOR El Plumerillo',
-  },
-  {
-    id: 'EQ-ILS-MDZ-18',
-    identificador: 'ILS 18 MENDOZA',
-    aeropuertoCodigo: 'MDZ',
-    modeloId: 'MOD-ILS-420',
-    frecuenciaVerificacionAereaMeses: 6,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: null,
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2026-04-10', // Límite: 2026-10-10 (Próximo a vencer)
-    fechaUltimoMantenimientoPreventivo: '2026-06-28', // Límite: 2026-09-28 (Próximo a vencer)
-    ubicacionDetalle: 'Pista 18',
-  },
-  {
-    id: 'EQ-VOR-RES',
-    identificador: 'VOR RESISTENCIA',
-    aeropuertoCodigo: 'RES',
-    modeloId: 'MOD-DVOR-432',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-DME-RES',
-    estadoOperativo: 'FUERA_DE_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-06-14', // Vencido
-    fechaUltimoMantenimientoPreventivo: '2026-03-20', // Vencido
-    ubicacionDetalle: 'Sector Operativo Resistencia',
-  },
-  {
-    id: 'EQ-DME-RES',
-    identificador: 'DME/VOR RESISTENCIA',
-    aeropuertoCodigo: 'RES',
-    modeloId: 'MOD-DME-1118',
-    frecuenciaVerificacionAereaMeses: 12,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: 'EQ-VOR-RES',
-    estadoOperativo: 'FUERA_DE_SERVICIO',
-    fechaUltimaVerificacionAerea: '2025-06-14',
-    fechaUltimoMantenimientoPreventivo: '2026-03-20',
-    ubicacionDetalle: 'Emplazamiento VOR Resistencia',
-  },
-  {
-    id: 'EQ-ILS-BRC-29',
-    identificador: 'ILS 29 BARILOCHE',
-    aeropuertoCodigo: 'BRC',
-    modeloId: 'MOD-ILS-7000B',
-    frecuenciaVerificacionAereaMeses: 6,
-    frecuenciaMantenimientoPreventivoMeses: 3,
-    equipoAsociadoId: null,
-    estadoOperativo: 'EN_SERVICIO',
-    fechaUltimaVerificacionAerea: '2026-07-22', // Al día
-    fechaUltimoMantenimientoPreventivo: '2026-07-22', // Al día
-    ubicacionDetalle: 'Cabecera RWY 29 San Carlos de Bariloche',
-  },
-];
+// Se vació junto con los aeropuertos ficticios: los equipos instalados reales
+// se cargan más adelante, ya asociados a los aeropuertos de la lista real.
+export const INITIAL_EQUIPOS: EquipoInstalado[] = [];
 
 export const INITIAL_NOMINA: Tecnico[] = [
   {
