@@ -10,6 +10,7 @@ import {
   ComisionServicio,
   IntervencionMantenimiento,
   RegistroAuditoria,
+  ArticuloStock,
 } from '../types';
 
 function throwSiError(error: { message: string } | null) {
@@ -298,6 +299,94 @@ export async function insertarIntervencionesDB(items: IntervencionMantenimiento[
     }))
   );
   throwSiError(error);
+}
+
+// ---------- Artículos de stock (Repuestos / Instrumental / Consumibles) ----------
+const rowToArticulo = (r: any): ArticuloStock => ({
+  id: r.id,
+  categoria: r.categoria,
+  modulo: r.modulo,
+  descripcion: r.descripcion ?? undefined,
+  nParte: r.n_parte ?? undefined,
+  marca: r.marca ?? undefined,
+  nSerie: r.n_serie ?? undefined,
+  modeloEquipoId: r.modelo_equipo_id,
+  estado: r.estado,
+  cantidad: r.cantidad,
+  ubicacionTipo: r.ubicacion_tipo,
+  ubicacionAeropuertoCodigo: r.ubicacion_aeropuerto_codigo,
+  eliminadoAt: r.eliminado_at ?? undefined,
+});
+
+export async function fetchArticulos(): Promise<ArticuloStock[]> {
+  const { data, error } = await supabase.from('articulos_stock').select('*').order('modulo');
+  throwSiError(error);
+  return (data || []).map(rowToArticulo);
+}
+
+export async function insertarArticulo(a: ArticuloStock) {
+  const { error } = await supabase.from('articulos_stock').insert({
+    id: a.id,
+    categoria: a.categoria,
+    modulo: a.modulo,
+    descripcion: a.descripcion || null,
+    n_parte: a.nParte || null,
+    marca: a.marca || null,
+    n_serie: a.nSerie || null,
+    modelo_equipo_id: a.modeloEquipoId || null,
+    estado: a.estado,
+    cantidad: a.cantidad,
+    ubicacion_tipo: a.ubicacionTipo,
+    ubicacion_aeropuerto_codigo: a.ubicacionAeropuertoCodigo || null,
+  });
+  throwSiError(error);
+}
+
+export async function actualizarArticuloDB(a: ArticuloStock) {
+  const { error } = await supabase
+    .from('articulos_stock')
+    .update({
+      modulo: a.modulo,
+      descripcion: a.descripcion || null,
+      n_parte: a.nParte || null,
+      marca: a.marca || null,
+      n_serie: a.nSerie || null,
+      modelo_equipo_id: a.modeloEquipoId || null,
+      estado: a.estado,
+      cantidad: a.cantidad,
+      ubicacion_tipo: a.ubicacionTipo,
+      ubicacion_aeropuerto_codigo: a.ubicacionAeropuertoCodigo || null,
+    })
+    .eq('id', a.id);
+  throwSiError(error);
+}
+
+export async function darDeBajaArticuloDB(id: string, eliminadoAt: string) {
+  const { error } = await supabase
+    .from('articulos_stock')
+    .update({ eliminado_at: eliminadoAt })
+    .eq('id', id);
+  throwSiError(error);
+}
+
+// ---------- Movimientos de stock (por ahora solo lectura: fecha del último
+// movimiento de cada artículo, para mostrarla en los maestros de stock. La
+// pantalla para registrar movimientos todavía no existe). ----------
+export async function fetchUltimoMovimientoPorArticulo(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('movimiento_articulos')
+    .select('articulo_id, movimientos_stock(fecha)');
+  throwSiError(error);
+  const ultimos: Record<string, string> = {};
+  (data || []).forEach((fila: any) => {
+    const fecha: string | undefined = fila.movimientos_stock?.fecha;
+    if (!fecha) return;
+    const actual = ultimos[fila.articulo_id];
+    if (!actual || fecha > actual) {
+      ultimos[fila.articulo_id] = fecha;
+    }
+  });
+  return ultimos;
 }
 
 // ---------- Auditoría ----------

@@ -7,6 +7,8 @@ import { RadioayudasView } from './components/RadioayudasView';
 import { TecnicosView } from './components/TecnicosView';
 import { AeropuertosView } from './components/AeropuertosView';
 import { ModelosEquipoView } from './components/ModelosEquipoView';
+import { RepuestosView } from './components/RepuestosView';
+import { InstrumentalView } from './components/InstrumentalView';
 import { Radio, Database, ShieldCheck, Server, AlertTriangle, X } from 'lucide-react';
 
 function MainApp() {
@@ -99,6 +101,8 @@ function MainApp() {
           <AeropuertosView onVerComisiones={verComisionesDeAeropuerto} />
         )}
         {vistaActiva === 'modelos' && <ModelosEquipoView />}
+        {vistaActiva === 'repuestos' && <RepuestosView />}
+        {vistaActiva === 'instrumental' && <InstrumentalView />}
       </main>
 
       {/* Pie de Página estilo IBM Maximo Enterprise */}

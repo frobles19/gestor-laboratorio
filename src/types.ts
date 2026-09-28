@@ -14,6 +14,28 @@ export interface Aeropuerto {
 
 export type SistemaRadioayuda = 'VOR' | 'DME' | 'ILS';
 
+export type CategoriaArticulo = 'Repuesto' | 'Instrumental' | 'Consumible';
+export type UbicacionTipo = 'LABORATORIO' | 'AEROPUERTO';
+export type EstadoArticulo = 'EN_SERVICIO' | 'FUERA_DE_SERVICIO' | 'A_REVISAR' | 'BAJA';
+
+export interface ArticuloStock {
+  id: string;
+  categoria: CategoriaArticulo;
+  modulo: string; // nombre del módulo/pieza, ej: "Exciter VOR/LOC-1F" — es el nombre del artículo
+  descripcion?: string; // información aparte del nombre, opcional
+  nParte?: string;
+  marca?: string;
+  nSerie?: string; // nunca obligatorio, en ninguna categoría
+  modeloEquipoId?: string | null; // solo en Repuestos ligados a un modelo
+  estado: EstadoArticulo;
+  // Repuesto/Instrumental: siempre 1 (cada fila es una unidad física).
+  // Consumible: la cantidad real en stock (solo se lleva en el Laboratorio).
+  cantidad: number;
+  ubicacionTipo: UbicacionTipo;
+  ubicacionAeropuertoCodigo?: string | null; // solo si ubicacionTipo = AEROPUERTO
+  eliminadoAt?: string;
+}
+
 export interface ModeloEquipo {
   id: string;
   sistema: SistemaRadioayuda;

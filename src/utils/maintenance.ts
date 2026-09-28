@@ -5,7 +5,42 @@ import {
   EstadoVencimiento,
   EstadoComision,
   SistemaRadioayuda,
+  EstadoArticulo,
 } from '../types';
+
+const ETIQUETA_ESTADO_ARTICULO: Record<EstadoArticulo, string> = {
+  EN_SERVICIO: 'En Servicio',
+  FUERA_DE_SERVICIO: 'Fuera de Servicio',
+  A_REVISAR: 'A Revisar',
+  BAJA: 'Baja',
+};
+
+// Versión corta para columnas angostas (tablas de stock).
+const ETIQUETA_CORTA_ESTADO_ARTICULO: Record<EstadoArticulo, string> = {
+  EN_SERVICIO: 'E/S',
+  FUERA_DE_SERVICIO: 'F/S',
+  A_REVISAR: 'REV',
+  BAJA: 'BAJA',
+};
+
+/**
+ * Paleta única de colores por estado de artículo de stock (repuestos,
+ * instrumental, consumibles).
+ */
+export function getClasesEstadoArticulo(estado: EstadoArticulo) {
+  const etiqueta = ETIQUETA_ESTADO_ARTICULO[estado];
+  const corta = ETIQUETA_CORTA_ESTADO_ARTICULO[estado];
+  switch (estado) {
+    case 'EN_SERVICIO':
+      return { badge: 'bg-[#defbe6] text-[#0e6027] border border-[#a7f0ba]', etiqueta, corta };
+    case 'FUERA_DE_SERVICIO':
+      return { badge: 'bg-[#ffebee] text-[#da1e28] border border-[#ffb3b8]', etiqueta, corta };
+    case 'A_REVISAR':
+      return { badge: 'bg-[#fef3d6] text-[#8a6100] border border-[#fddc69]', etiqueta, corta };
+    case 'BAJA':
+      return { badge: 'bg-[#e0e0e0] text-[#525252] border border-[#c6c6c6]', etiqueta, corta };
+  }
+}
 
 /**
  * Paleta única de colores por sistema de radioayuda (VOR/DME/ILS), para que

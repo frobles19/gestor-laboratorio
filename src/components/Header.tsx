@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Radio, Plane, ShieldCheck, Layers, History, ChevronDown, Cpu } from 'lucide-react';
+import { Radio, Plane, ShieldCheck, Layers, History, ChevronDown, Cpu, Wrench, Ruler } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export type VistaActiva =
@@ -8,7 +8,9 @@ export type VistaActiva =
   | 'radioayudas'
   | 'nomina'
   | 'aeropuertos'
-  | 'modelos';
+  | 'modelos'
+  | 'repuestos'
+  | 'instrumental';
 
 interface HeaderProps {
   vistaActiva: VistaActiva;
@@ -20,16 +22,31 @@ const OPCIONES_COMISIONES: { vista: VistaActiva; label: string; icon: React.Elem
   { vista: 'comisiones-logs', label: 'Historial de Comisiones', icon: History },
 ];
 
+const OPCIONES_ARTICULOS: { vista: VistaActiva; label: string; icon: React.ElementType }[] = [
+  { vista: 'repuestos', label: 'Repuestos', icon: Wrench },
+  { vista: 'instrumental', label: 'Instrumental', icon: Ruler },
+];
+
 export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) => {
   const { equipos } = useApp();
   const [menuComisionesAbierto, setMenuComisionesAbierto] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  const [menuArticulosAbierto, setMenuArticulosAbierto] = useState(false);
+  const menuArticulosRef = useRef<HTMLButtonElement>(null);
+  const panelArticulosRef = useRef<HTMLDivElement>(null);
+  const contenedorRef = useRef<HTMLDivElement>(null);
+  // Posición horizontal del panel de Artículos, calculada a partir del botón
+  // (a diferencia de Comisiones, no está primero en el menú, así que no le
+  // sirve un offset fijo: tiene que abrirse justo debajo de su propio botón).
+  const [articulosPanelLeft, setArticulosPanelLeft] = useState(0);
+
   const equiposFueraServicio = equipos.filter((e) => e.estadoOperativo === 'FUERA_DE_SERVICIO').length;
   const enModuloComisiones = vistaActiva === 'comisiones-maestro' || vistaActiva === 'comisiones-logs';
+  const enModuloArticulos = vistaActiva === 'repuestos' || vistaActiva === 'instrumental';
 
-  // Cierra el menú desplegable de Comisiones al hacer click fuera del botón y del panel
+  // Cierra los menúes desplegables al hacer click fuera del botón y del panel
   // (son hermanos en el DOM, no un único contenedor, para que el panel no quede
   // clipeado por el overflow-x-auto del <nav>).
   useEffect(() => {
@@ -43,6 +60,14 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
       ) {
         setMenuComisionesAbierto(false);
       }
+      if (
+        menuArticulosRef.current &&
+        !menuArticulosRef.current.contains(target) &&
+        panelArticulosRef.current &&
+        !panelArticulosRef.current.contains(target)
+      ) {
+        setMenuArticulosAbierto(false);
+      }
     };
     document.addEventListener('mousedown', handleClickFuera);
     return () => document.removeEventListener('mousedown', handleClickFuera);
@@ -51,6 +76,11 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
   const seleccionarOpcionComisiones = (vista: VistaActiva) => {
     setVistaActiva(vista);
     setMenuComisionesAbierto(false);
+  };
+
+  const seleccionarOpcionArticulos = (vista: VistaActiva) => {
+    setVistaActiva(vista);
+    setMenuArticulosAbierto(false);
   };
 
   return (
@@ -86,11 +116,14 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
         {/* Este contenedor (y no <nav>, que tiene overflow-x-auto y clipearía
             un hijo absoluto que sobresalga verticalmente) es el ancla de posición
             del menú desplegable de Comisiones. */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div ref={contenedorRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <nav className="flex space-x-1 overflow-x-auto py-1.5 scrollbar-none" aria-label="Tabs">
             <button
               ref={menuRef}
-              onClick={() => setMenuComisionesAbierto((prev) => !prev)}
+              onClick={() => {
+                setMenuComisionesAbierto((prev) => !prev);
+                setMenuArticulosAbierto(false);
+              }}
               className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                 enModuloComisiones
                   ? 'border-[#0f62fe] bg-[#393939] text-white'
@@ -126,6 +159,30 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
             >
               <Cpu className="w-4.5 h-4.5 text-[#be95ff]" />
               <span>Modelos</span>
+            </button>
+
+            <button
+              ref={menuArticulosRef}
+              onClick={() => {
+                if (menuArticulosRef.current && contenedorRef.current) {
+                  const btnRect = menuArticulosRef.current.getBoundingClientRect();
+                  const contRect = contenedorRef.current.getBoundingClientRect();
+                  setArticulosPanelLeft(btnRect.left - contRect.left);
+                }
+                setMenuArticulosAbierto((prev) => !prev);
+                setMenuComisionesAbierto(false);
+              }}
+              className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                enModuloArticulos
+                  ? 'border-[#0f62fe] bg-[#393939] text-white'
+                  : 'border-transparent text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+              }`}
+            >
+              <Wrench className="w-4.5 h-4.5 text-[#ff832b]" />
+              <span>Artículos</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform ${menuArticulosAbierto ? 'rotate-180' : ''}`}
+              />
             </button>
 
             <button
@@ -175,6 +232,29 @@ export const Header: React.FC<HeaderProps> = ({ vistaActiva, setVistaActiva }) =
                   }`}
                 >
                   <Icon className="w-4 h-4 text-[#82cfff] shrink-0" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {menuArticulosAbierto && (
+            <div
+              ref={panelArticulosRef}
+              style={{ left: articulosPanelLeft }}
+              className="absolute top-full mt-1 w-72 bg-[#262626] border border-[#393939] shadow-lg z-50 py-1"
+            >
+              {OPCIONES_ARTICULOS.map(({ vista, label, icon: Icon }) => (
+                <button
+                  key={vista}
+                  onClick={() => seleccionarOpcionArticulos(vista)}
+                  className={`w-full flex items-center space-x-2.5 px-4 py-2.5 text-sm text-left whitespace-nowrap transition-colors cursor-pointer ${
+                    vistaActiva === vista
+                      ? 'bg-[#393939] text-white'
+                      : 'text-[#c6c6c6] hover:bg-[#333333] hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 text-[#ff832b] shrink-0" />
                   <span>{label}</span>
                 </button>
               ))}

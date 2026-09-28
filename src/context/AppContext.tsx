@@ -10,6 +10,7 @@ import {
   TipoIntervencion,
   RegistroAuditoria,
   AccionAuditoria,
+  ArticuloStock,
 } from '../types';
 import {
   determinarJefeComision,
@@ -33,6 +34,8 @@ interface AppContextType {
   comisionesEliminadas: ComisionServicio[]; // baja lógica: se conservan para el historial
   intervenciones: IntervencionMantenimiento[];
   auditoria: RegistroAuditoria[];
+  articulos: ArticuloStock[]; // solo los visibles (excluye los dados de baja)
+  ultimosMovimientosPorArticulo: Record<string, string>; // id de artículo -> fecha ISO del último movimiento
 
   // Acciones de Comisiones
   crearComision: (
@@ -81,6 +84,41 @@ interface AppContextType {
     datos: Pick<ModeloEquipo, 'sistema' | 'denominacion' | 'fabricante'>
   ) => void;
   eliminarModelo: (id: string) => void;
+
+  // Acciones de Artículos de Stock (Repuestos / Instrumental / Consumibles)
+  crearArticulo: (
+    datos: Pick<
+      ArticuloStock,
+      | 'categoria'
+      | 'modulo'
+      | 'descripcion'
+      | 'nParte'
+      | 'marca'
+      | 'nSerie'
+      | 'modeloEquipoId'
+      | 'estado'
+      | 'cantidad'
+      | 'ubicacionTipo'
+      | 'ubicacionAeropuertoCodigo'
+    >
+  ) => void;
+  actualizarArticulo: (
+    id: string,
+    datos: Pick<
+      ArticuloStock,
+      | 'modulo'
+      | 'descripcion'
+      | 'nParte'
+      | 'marca'
+      | 'nSerie'
+      | 'modeloEquipoId'
+      | 'estado'
+      | 'cantidad'
+      | 'ubicacionTipo'
+      | 'ubicacionAeropuertoCodigo'
+    >
+  ) => void;
+  eliminarArticulo: (id: string) => void;
 
   // Utilidades
   getEquipoPorId: (id: string) => EquipoInstalado | undefined;
@@ -140,6 +178,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [intervenciones, setIntervenciones] = useState<IntervencionMantenimiento[]>([]);
   const [auditoria, setAuditoria] = useState<RegistroAuditoria[]>([]);
 
+  const [articulosTodos, setArticulosTodos] = useState<ArticuloStock[]>([]);
+  const articulos = useMemo(
+    () => articulosTodos.filter((a) => !a.eliminadoAt),
+    [articulosTodos]
+  );
+  // Fecha del último movimiento de stock registrado, por artículo (id -> fecha ISO).
+  const [ultimosMovimientosPorArticulo, setUltimosMovimientosPorArticulo] = useState<
+    Record<string, string>
+  >({});
+
   // Carga inicial: todo viene de Supabase (radioayudas-dev), no de localStorage.
   useEffect(() => {
     let cancelado = false;
@@ -151,8 +199,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       repo.fetchComisiones(),
       repo.fetchIntervenciones(),
       repo.fetchAuditoria(),
+      repo.fetchArticulos(),
+      repo.fetchUltimoMovimientoPorArticulo(),
     ])
-      .then(([aero, mod, eq, tec, com, interv, audit]) => {
+      .then(([aero, mod, eq, tec, com, interv, audit, articulosDB, ultimosMov]) => {
         if (cancelado) return;
         setAeropuertos(aero);
         setModelosTodos(mod);
@@ -161,6 +211,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setComisiones(com);
         setIntervenciones(interv);
         setAuditoria(audit);
+        setArticulosTodos(articulosDB);
+        setUltimosMovimientosPorArticulo(ultimosMov);
       })
       .catch((err) => {
         if (cancelado) return;
@@ -744,6 +796,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sync(repo.darDeBajaModeloDB(id, eliminadoAt), 'la baja del modelo');
   };
 
+  const crearArticulo = (
+    datos: Pick<
+      ArticuloStock,
+      | 'categoria'
+      | 'modulo'
+      | 'descripcion'
+      | 'nParte'
+      | 'marca'
+      | 'nSerie'
+      | 'modeloEquipoId'
+      | 'estado'
+      | 'cantidad'
+      | 'ubicacionTipo'
+      | 'ubicacionAeropuertoCodigo'
+    >
+  ) => {
+    const modulo = datos.modulo.trim();
+    if (!modulo) {
+      throw new Error('El nombre del módulo es obligatorio.');
+    }
+    if (datos.ubicacionTipo === 'AEROPUERTO' && !datos.ubicacionAeropuertoCodigo) {
+      throw new Error('Debe seleccionar un aeropuerto para esta ubicación.');
+    }
+    const nuevo: ArticuloStock = {
+      id: generarId('ART'),
+      categoria: datos.categoria,
+      modulo,
+      descripcion: datos.descripcion?.trim() || undefined,
+      nParte: datos.nParte?.trim() || undefined,
+      marca: datos.marca?.trim() || undefined,
+      nSerie: datos.nSerie?.trim() || undefined,
+      modeloEquipoId: datos.modeloEquipoId || null,
+      estado: datos.estado,
+      cantidad: datos.cantidad,
+      ubicacionTipo: datos.ubicacionTipo,
+      ubicacionAeropuertoCodigo:
+        datos.ubicacionTipo === 'AEROPUERTO' ? datos.ubicacionAeropuertoCodigo : null,
+    };
+    setArticulosTodos((prev) => [...prev, nuevo]);
+    sync(repo.insertarArticulo(nuevo), `el artículo ${modulo}`);
+  };
+
+  const actualizarArticulo = (
+    id: string,
+    datos: Pick<
+      ArticuloStock,
+      | 'modulo'
+      | 'descripcion'
+      | 'nParte'
+      | 'marca'
+      | 'nSerie'
+      | 'modeloEquipoId'
+      | 'estado'
+      | 'cantidad'
+      | 'ubicacionTipo'
+      | 'ubicacionAeropuertoCodigo'
+    >
+  ) => {
+    const actual = articulos.find((a) => a.id === id);
+    if (!actual) {
+      throw new Error('El artículo indicado no existe.');
+    }
+    const modulo = datos.modulo.trim();
+    if (!modulo) {
+      throw new Error('El nombre del módulo es obligatorio.');
+    }
+    if (datos.ubicacionTipo === 'AEROPUERTO' && !datos.ubicacionAeropuertoCodigo) {
+      throw new Error('Debe seleccionar un aeropuerto para esta ubicación.');
+    }
+    const actualizado: ArticuloStock = {
+      ...actual,
+      modulo,
+      descripcion: datos.descripcion?.trim() || undefined,
+      nParte: datos.nParte?.trim() || undefined,
+      marca: datos.marca?.trim() || undefined,
+      nSerie: datos.nSerie?.trim() || undefined,
+      modeloEquipoId: datos.modeloEquipoId || null,
+      estado: datos.estado,
+      cantidad: datos.cantidad,
+      ubicacionTipo: datos.ubicacionTipo,
+      ubicacionAeropuertoCodigo:
+        datos.ubicacionTipo === 'AEROPUERTO' ? datos.ubicacionAeropuertoCodigo : null,
+    };
+    setArticulosTodos((prev) => prev.map((a) => (a.id === id ? actualizado : a)));
+    sync(repo.actualizarArticuloDB(actualizado), `el artículo ${modulo}`);
+  };
+
+  // Baja lógica: por ahora sin bloqueo (los movimientos de stock todavía no existen).
+  const eliminarArticulo = (id: string) => {
+    if (!articulos.some((a) => a.id === id)) {
+      throw new Error('El artículo indicado no existe.');
+    }
+    const eliminadoAt = new Date().toISOString();
+    setArticulosTodos((prev) => prev.map((a) => (a.id === id ? { ...a, eliminadoAt } : a)));
+    sync(repo.darDeBajaArticuloDB(id, eliminadoAt), 'la baja del artículo');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -759,6 +908,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         comisionesEliminadas,
         intervenciones,
         auditoria,
+        articulos,
+        ultimosMovimientosPorArticulo,
         crearComision,
         actualizarComision,
         cancelarComision,
@@ -774,6 +925,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         crearModelo,
         actualizarModelo,
         eliminarModelo,
+        crearArticulo,
+        actualizarArticulo,
+        eliminarArticulo,
         getEquipoPorId,
         getModeloPorId,
         getAeropuertoPorCodigo,

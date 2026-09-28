@@ -370,9 +370,9 @@ export const LogsComisionesView: React.FC = () => {
                       </td>
                       <td className="py-3 px-3.5 border-r border-[#e0e0e0] align-top whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${config.classes}`}
+                          className={`w-36 inline-flex items-center justify-center space-x-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${config.classes}`}
                         >
-                          <Icon className="w-3.5 h-3.5" />
+                          <Icon className="w-4 h-4 shrink-0" />
                           <span>{config.label}</span>
                         </span>
                       </td>
